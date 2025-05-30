@@ -7,6 +7,8 @@ import { ModernTextInput } from '../ModernTextInput';
 import { SelectableCardGrid } from '../SelectableCardGrid';
 import { Salad, BookOpen, Ticket } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { updateFormData } from '@/store/challengeSlice';
 
 const formSchema = z.object({
   nextBestActions: z.array(z.string()).min(1, 'Select at least one action'),
@@ -90,26 +92,49 @@ const questions = [
 ];
 
 export function useFeaturesForm() {
+  const { formData } = useAppSelector((state) => state.challenge);
+  
   return useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nextBestActions: [],
+      nextBestActions: formData.features?.tracking || [],
       promoHeadline: '',
       promoDetails: '',
       promoImage: '',
-      leaderboardType: '',
+      leaderboardType: formData.features?.gamification?.[0] || '',
     },
     mode: 'onChange',
   });
 }
+
 export const FEATURES_TOTAL = questions.length;
 
 export function FeaturesStep({ subStep, form }: { subStep: number; form: ReturnType<typeof useFeaturesForm> }) {
+  const dispatch = useAppDispatch();
+  const { formData } = useAppSelector((state) => state.challenge);
+
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      dispatch(updateFormData({
+        features: {
+          tracking: (value.nextBestActions || []).filter((item): item is string => item !== undefined),
+          social: [],
+          gamification: value.leaderboardType ? [value.leaderboardType] : [],
+          support: [],
+        }
+      }));
+    });
+    return () => subscription.unsubscribe();
+  }, [form, dispatch]);
+
   useEffect(() => {
     const el = document.querySelector('input,select,button[aria-pressed]');
     if (el) (el as HTMLElement).focus();
   }, [subStep]);
+
   const currentQuestion = questions[subStep];
+  const currentValue = form.watch(currentQuestion.name as any);
+
   return (
     <Form {...form}>
       <FormField
@@ -126,7 +151,7 @@ export function FeaturesStep({ subStep, form }: { subStep: number; form: ReturnT
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentQuestion.render(field, form, fieldState)}
+                {currentQuestion.render({ ...field, value: currentValue }, form, fieldState)}
               </motion.div>
             </AnimatePresence>
             <FormMessage />

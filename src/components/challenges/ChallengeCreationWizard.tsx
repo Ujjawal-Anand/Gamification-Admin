@@ -2,22 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Progress, SegmentedProgress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BasicInformationStep, useBasicInformationForm, BASIC_INFO_TOTAL } from './steps/BasicInformationStep';
 import { TimelineStep, useTimelineForm, TIMELINE_TOTAL } from './steps/TimelineStep';
 import { DetailsStep, useDetailsForm, DETAILS_TOTAL } from './steps/DetailsStep';
-import { ObjectiveStep, useObjectiveForm, OBJECTIVE_TOTAL } from './steps/ObjectiveStep';
+import { ObjectiveStep, useObjectiveForm, getObjectiveTotal } from './steps/ObjectiveStep';
 import { RewardsStep, useRewardsForm, getRewardsVisibleQuestions } from './steps/RewardsStep';
 import { EligibilityStep, useEligibilityForm, ELIGIBILITY_TOTAL } from './steps/EligibilityStep';
 import { FeaturesStep, useFeaturesForm, FEATURES_TOTAL } from './steps/FeaturesStep';
+import { ReviewStep } from './steps/ReviewStep';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setCurrentStep, setCurrentSubStep } from '@/store/challengeSlice';
 
 const steps = [
   { id: 'basic', label: 'Basic Information' },
+  { id: 'objective', label: 'Challenge Objective' },
   { id: 'timeline', label: 'Challenge Timeline' },
   { id: 'details', label: 'Challenge Details' },
-  { id: 'objective', label: 'Challenge Objective' },
   { id: 'rewards', label: 'Rewards & Recognition' },
   { id: 'eligibility', label: 'User Eligibility' },
   { id: 'features', label: 'Additional Features' },
@@ -25,7 +28,9 @@ const steps = [
 ];
 
 export function ChallengeCreationWizard() {
-  const [currentStep, setCurrentStep] = useState(0);
+  const dispatch = useAppDispatch();
+  const { currentStep, currentSubStep, formData } = useAppSelector((state) => state.challenge);
+  
   // For Basic Information step, manage subStep
   const [basicInfoSubStep, setBasicInfoSubStep] = useState(0);
   const basicInfoForm = useBasicInformationForm();
@@ -63,6 +68,10 @@ export function ChallengeCreationWizard() {
   const isEligibilityStep = steps[currentStep].id === 'eligibility';
   const isFeaturesStep = steps[currentStep].id === 'features';
 
+  const category = formData.basicInformation?.category || '';
+  const theme = formData.basicInformation?.theme || '';
+  const objectiveTotal = getObjectiveTotal(category, theme);
+
   // Substep field arrays
   const basicInfoQuestions: ('name' | 'category' | 'theme' | 'importance')[] = ['name', 'category', 'theme', 'importance'];
   const timelineQuestions: ('enrollmentStartDate' | 'enrollmentEndDate' | 'activeStartDate' | 'activeEndDate')[] = [
@@ -72,7 +81,7 @@ export function ChallengeCreationWizard() {
     'activeEndDate',
   ];
   const detailsQuestions: ('headline' | 'summary' | 'image' | 'heroImage')[] = ['headline', 'summary', 'image', 'heroImage'];
-  const objectiveQuestions: ('objective' | 'criteria')[] = ['objective', 'criteria'];
+  const objectiveQuestions: ('objective' | 'measurement' | 'trackingPeriod' | 'squaresRequired' | 'dailyChallenges' | 'questionsRequired')[] = ['objective', 'measurement', 'trackingPeriod', 'squaresRequired', 'dailyChallenges', 'questionsRequired'];
   const rewardsQuestions: ('rewardTypes' | 'points' | 'badge' | 'sponsoredReward')[] = ['rewardTypes', 'points', 'badge', 'sponsoredReward'];
   const eligibilityQuestions: ('cohort')[] = ['cohort'];
   const featuresQuestions: ('nextBestActions' | 'promoHeadline' | 'promoDetails' | 'promoImage' | 'leaderboardType')[] = [
@@ -105,20 +114,13 @@ export function ChallengeCreationWizard() {
   }, [FEATURES_TOTAL_DYNAMIC, isFeaturesStep]);
 
   // isFirst and isLast logic
-  const isFirst =
-    (isBasicInfoStep && currentStep === 0 && basicInfoSubStep === 0) ||
-    (isTimelineStep && currentStep === 1 && timelineSubStep === 0) ||
-    (isDetailsStep && currentStep === 2 && detailsSubStep === 0) ||
-    (isObjectiveStep && currentStep === 3 && objectiveSubStep === 0) ||
-    (isRewardsStep && currentStep === 4 && rewardsSubStep === 0) ||
-    (isEligibilityStep && currentStep === 5 && eligibilitySubStep === 0) ||
-    (isFeaturesStep && currentStep === 6 && featuresSubStep === 0);
+  const isFirst = currentStep === 0 && currentSubStep === 0;
 
   const isLast =
     (isBasicInfoStep && basicInfoSubStep === BASIC_INFO_TOTAL - 1 && currentStep === steps.length - 1) ||
     (isTimelineStep && timelineSubStep === TIMELINE_TOTAL - 1 && currentStep === steps.length - 1) ||
     (isDetailsStep && detailsSubStep === DETAILS_TOTAL - 1 && currentStep === steps.length - 1) ||
-    (isObjectiveStep && objectiveSubStep === OBJECTIVE_TOTAL - 1 && currentStep === steps.length - 1) ||
+    (isObjectiveStep && objectiveSubStep === objectiveTotal - 1 && currentStep === steps.length - 1) ||
     (isRewardsStep && rewardsSubStep === REWARDS_TOTAL_DYNAMIC - 1 && currentStep === steps.length - 1) ||
     (isEligibilityStep && eligibilitySubStep === ELIGIBILITY_TOTAL - 1 && currentStep === steps.length - 1) ||
     (isFeaturesStep && featuresSubStep === FEATURES_TOTAL - 1 && currentStep === steps.length - 1) ||
@@ -127,42 +129,49 @@ export function ChallengeCreationWizard() {
   // isValid logic
   let isValid = true;
   if (isBasicInfoStep) {
-    const field = basicInfoQuestions[basicInfoSubStep];
-    const fieldState = basicInfoForm.getFieldState(field);
-    const fieldValue = basicInfoForm.watch(field);
-    isValid = !!fieldValue && !fieldState.invalid;
+    const field = basicInfoQuestions[currentSubStep];
+    const value = formData.basicInformation?.[field];
+    console.log('Basic Info - Field:', field, 'Value:', value);
+    isValid = !!value;
   } else if (isTimelineStep) {
-    const field = timelineQuestions[timelineSubStep];
-    const fieldState = timelineForm.getFieldState(field);
-    const fieldValue = timelineForm.watch(field);
-    isValid = field === 'enrollmentEndDate' ? true : !!fieldValue && !fieldState.invalid;
+    const field = timelineQuestions[currentSubStep];
+    const value = timelineForm.getValues(field);
+    console.log('Timeline - Field:', field, 'Value:', value);
+    isValid = field === 'enrollmentEndDate' ? true : !!value;
   } else if (isDetailsStep) {
-    const field = detailsQuestions[detailsSubStep];
-    const fieldState = detailsForm.getFieldState(field);
-    const fieldValue = detailsForm.watch(field);
-    isValid = !!fieldValue && !fieldState.invalid;
+    const field = detailsQuestions[currentSubStep];
+    const value = detailsForm.getValues(field);
+    console.log('Details - Field:', field, 'Value:', value);
+    isValid = !!value;
   } else if (isObjectiveStep) {
-    const field = objectiveQuestions[objectiveSubStep];
-    const fieldState = objectiveForm.getFieldState(field);
-    const fieldValue = objectiveForm.watch(field);
-    isValid = !!fieldValue && !fieldState.invalid;
+    const field = objectiveQuestions[currentSubStep];
+    const value = objectiveForm.getValues(field);
+    console.log('Objective Step Debug:', {
+      field,
+      value,
+      theme,
+      formValues: objectiveForm.getValues(),
+      formState: objectiveForm.formState,
+      isValid: !!value
+    });
+    isValid = theme === 'Bingo' ? !!objectiveForm.getValues('squaresRequired') : !!value;
   } else if (isRewardsStep) {
-    const currentQuestion = rewardsVisibleQuestions[rewardsSubStep];
-    const field = currentQuestion?.name;
-    const fieldState = rewardsForm.getFieldState(field as any);
-    const fieldValue = rewardsForm.watch(field as any);
-    isValid = !!fieldValue && !fieldState.invalid;
+    const currentQuestion = rewardsVisibleQuestions[currentSubStep];
+    const value = rewardsForm.getValues(currentQuestion?.name as any);
+    console.log('Rewards - Field:', currentQuestion?.name, 'Value:', value);
+    isValid = !!value;
   } else if (isEligibilityStep) {
-    const field = eligibilityQuestions[eligibilitySubStep];
-    const fieldState = eligibilityForm.getFieldState(field);
-    const fieldValue = eligibilityForm.watch(field);
-    isValid = !!fieldValue && !fieldState.invalid;
+    const field = eligibilityQuestions[currentSubStep];
+    const value = eligibilityForm.getValues(field);
+    console.log('Eligibility - Field:', field, 'Value:', value);
+    isValid = !!value;
   } else if (isFeaturesStep) {
-    const field = featuresVisibleQuestions[featuresSubStep];
-    const fieldState = featuresForm.getFieldState(field as any);
-    const fieldValue = featuresForm.watch(field as any);
-    isValid = !!fieldValue && !fieldState.invalid;
+    const field = featuresVisibleQuestions[currentSubStep];
+    const value = featuresForm.getValues(field as any);
+    console.log('Features - Field:', field, 'Value:', value);
+    isValid = !!value;
   }
+  console.log('Current Step:', currentStep, 'SubStep:', currentSubStep, 'IsValid:', isValid);
 
   function handleNext() {
     if (isBasicInfoStep) {
@@ -170,24 +179,32 @@ export function ChallengeCreationWizard() {
         setBasicInfoSubStep((s) => s + 1);
         return;
       }
+      dispatch(setCurrentStep(currentStep + 1));
+      return;
     }
     if (isTimelineStep) {
       if (timelineSubStep < TIMELINE_TOTAL - 1) {
         setTimelineSubStep((s) => s + 1);
         return;
       }
+      dispatch(setCurrentStep(currentStep + 1));
+      return;
     }
     if (isDetailsStep) {
       if (detailsSubStep < DETAILS_TOTAL - 1) {
         setDetailsSubStep((s) => s + 1);
         return;
       }
+      dispatch(setCurrentStep(currentStep + 1));
+      return;
     }
     if (isObjectiveStep) {
-      if (objectiveSubStep < OBJECTIVE_TOTAL - 1) {
+      if (objectiveSubStep < objectiveTotal - 1) {
         setObjectiveSubStep((s) => s + 1);
         return;
       }
+      dispatch(setCurrentStep(currentStep + 1));
+      return;
     }
     if (isRewardsStep) {
       if (rewardsSubStep < REWARDS_TOTAL_DYNAMIC - 1) {
@@ -208,20 +225,14 @@ export function ChallengeCreationWizard() {
       }
     }
     if (currentStep < steps.length - 1) {
-      setCurrentStep((s) => s + 1);
-      setBasicInfoSubStep(0);
-      setTimelineSubStep(0);
-      setDetailsSubStep(0);
-      setObjectiveSubStep(0);
-      setRewardsSubStep(0);
-      setEligibilitySubStep(0);
-      setFeaturesSubStep(0);
+      dispatch(setCurrentStep(currentStep + 1));
+      dispatch(setCurrentSubStep(0));
     }
   }
 
   function handleBack() {
-    if (isBasicInfoStep && basicInfoSubStep > 0) {
-      setBasicInfoSubStep((s) => s - 1);
+    if (isBasicInfoStep && currentSubStep > 0) {
+      dispatch(setCurrentSubStep(currentSubStep - 1));
       return;
     }
     if (isTimelineStep && timelineSubStep > 0) {
@@ -249,14 +260,8 @@ export function ChallengeCreationWizard() {
       return;
     }
     if (currentStep > 0) {
-      setCurrentStep((s) => s - 1);
-      setBasicInfoSubStep(0);
-      setTimelineSubStep(0);
-      setDetailsSubStep(0);
-      setObjectiveSubStep(0);
-      setRewardsSubStep(0);
-      setEligibilitySubStep(0);
-      setFeaturesSubStep(0);
+      dispatch(setCurrentStep(currentStep - 1));
+      dispatch(setCurrentSubStep(0));
     }
   }
 
@@ -306,7 +311,7 @@ export function ChallengeCreationWizard() {
   let stepContent = null;
   if (isBasicInfoStep) {
     stepContent = (
-      <BasicInformationStep subStep={basicInfoSubStep} form={basicInfoForm} />
+      <BasicInformationStep subStep={basicInfoSubStep} />
     );
   } else if (isTimelineStep) {
     stepContent = (
@@ -337,33 +342,66 @@ export function ChallengeCreationWizard() {
       <FeaturesStep subStep={featuresSubStep} form={featuresForm} />
     );
   } else {
-    stepContent = <div>Review & Publish Coming Soon</div>;
+    stepContent = <ReviewStep />;
   }
 
-  // Progress calculation (linear, counting all substeps)
-  const totalSteps =
-    steps.length + (BASIC_INFO_TOTAL - 1) + (TIMELINE_TOTAL - 1) + (DETAILS_TOTAL - 1) + (OBJECTIVE_TOTAL - 1) + (REWARDS_TOTAL_DYNAMIC - 1) + (ELIGIBILITY_TOTAL - 1) + (FEATURES_TOTAL - 1);
-  const currentProgress = isBasicInfoStep
-    ? currentStep + basicInfoSubStep
-    : isTimelineStep
-    ? currentStep + (BASIC_INFO_TOTAL - 1) + timelineSubStep
-    : isDetailsStep
-    ? currentStep + (BASIC_INFO_TOTAL - 1) + (TIMELINE_TOTAL - 1) + detailsSubStep
-    : isObjectiveStep
-    ? currentStep + (BASIC_INFO_TOTAL - 1) + (TIMELINE_TOTAL - 1) + (DETAILS_TOTAL - 1) + objectiveSubStep
-    : isRewardsStep
-    ? currentStep + (BASIC_INFO_TOTAL - 1) + (TIMELINE_TOTAL - 1) + (DETAILS_TOTAL - 1) + (OBJECTIVE_TOTAL - 1) + rewardsSubStep
-    : isEligibilityStep
-    ? currentStep + (BASIC_INFO_TOTAL - 1) + (TIMELINE_TOTAL - 1) + (DETAILS_TOTAL - 1) + (OBJECTIVE_TOTAL - 1) + (REWARDS_TOTAL_DYNAMIC - 1) + eligibilitySubStep
-    : isFeaturesStep
-    ? currentStep + (BASIC_INFO_TOTAL - 1) + (TIMELINE_TOTAL - 1) + (DETAILS_TOTAL - 1) + (OBJECTIVE_TOTAL - 1) + (REWARDS_TOTAL_DYNAMIC - 1) + (ELIGIBILITY_TOTAL - 1) + featuresSubStep
-    : currentStep + (BASIC_INFO_TOTAL - 1) + (TIMELINE_TOTAL - 1) + (DETAILS_TOTAL - 1) + (OBJECTIVE_TOTAL - 1) + (REWARDS_TOTAL_DYNAMIC - 1) + (ELIGIBILITY_TOTAL - 1) + (FEATURES_TOTAL - 1);
-  const progress = ((currentProgress + 1) / totalSteps) * 100;
+  // Calculate progress for each section
+  const getSectionProgress = (sectionIndex: number) => {
+    const section = steps[sectionIndex];
+    let progress = 0;
+    let total = 0;
+
+    if (section.id === 'basic') {
+      progress = basicInfoSubStep;
+      total = BASIC_INFO_TOTAL;
+    } else if (section.id === 'timeline') {
+      progress = timelineSubStep;
+      total = TIMELINE_TOTAL;
+    } else if (section.id === 'details') {
+      progress = detailsSubStep;
+      total = DETAILS_TOTAL;
+    } else if (section.id === 'objective') {
+      progress = objectiveSubStep;
+      total = objectiveTotal;
+    } else if (section.id === 'rewards') {
+      progress = rewardsSubStep;
+      total = REWARDS_TOTAL_DYNAMIC;
+    } else if (section.id === 'eligibility') {
+      progress = eligibilitySubStep;
+      total = ELIGIBILITY_TOTAL;
+    } else if (section.id === 'features') {
+      progress = featuresSubStep;
+      total = FEATURES_TOTAL;
+    }
+
+    // Calculate progress as a percentage
+    const percentage = (progress / total) * 100;
+    
+    // If this is the active section, show partial progress
+    if (sectionIndex === currentStep) {
+      return percentage;
+    }
+    
+    // If this is a completed section, show 100%
+    if (sectionIndex < currentStep) {
+      return 100;
+    }
+    
+    // If this is a future section, show 0%
+    return 0;
+  };
+
+  const progressSegments = steps.map((step, index) => ({
+    label: step.label,
+    value: getSectionProgress(index),
+    isActive: currentStep === index,
+    isCompleted: currentStep > index
+  }));
 
   return (
     <div className="relative min-h-screen bg-background flex flex-col">
       {/* Sticky Top Bar */}
-      <div className="sticky top-0 z-30 bg-white border-b flex justify-between items-center px-6 py-4 shadow-sm">
+      <div className="sticky top-0 z-30 bg-white flex justify-between items-center px-6 py-4">
         <Button variant="outline" className="rounded-full px-6">Save & exit</Button>
         <Button variant="outline" className="rounded-full px-6">Questions?</Button>
       </div>
@@ -376,9 +414,9 @@ export function ChallengeCreationWizard() {
       </div>
 
       {/* Sticky Bottom Bar */}
-      <div className="sticky bottom-0 z-30 bg-white border-t flex flex-col items-center px-4 py-4">
-        <Progress value={progress} className="w-full max-w-xl h-2 rounded-full mb-4" />
-        <div className="flex w-full max-w-xl justify-between items-center">
+      <div className="sticky bottom-0 z-30 bg-white flex flex-col items-center py-4">
+        <SegmentedProgress segments={progressSegments} className="w-full max-w-xl mb-4" />
+        <div className="flex w-full max-w-xl justify-between items-center px-4">
           <Button
             variant="outline"
             type="button"

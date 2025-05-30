@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { updateFormData } from '@/store/challengeSlice';
 
 const formSchema = z.object({
   enrollmentStartDate: z.date({
@@ -142,10 +144,29 @@ export function TimelineStep({
   subStep: number;
   form: ReturnType<typeof useForm<z.infer<typeof formSchema>>>;
 }) {
+  const dispatch = useAppDispatch();
+  const { formData } = useAppSelector((state) => state.challenge);
+
   useEffect(() => {
     const el = document.querySelector('button[aria-pressed],input');
     if (el) (el as HTMLElement).focus();
   }, [subStep]);
+
+  // Update Redux store when form values change
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      console.log('Timeline form value changed:', value);
+      // Convert dates to ISO strings for Redux
+      const timelineData = {
+        enrollmentStartDate: value.enrollmentStartDate?.toISOString() || '',
+        enrollmentEndDate: value.enrollmentEndDate?.toISOString(),
+        activeStartDate: value.activeStartDate?.toISOString() || '',
+        activeEndDate: value.activeEndDate?.toISOString() || '',
+      };
+      dispatch(updateFormData({ timeline: timelineData }));
+    });
+    return () => subscription.unsubscribe();
+  }, [form, dispatch]);
 
   const currentQuestion = questions[subStep];
 
@@ -154,7 +175,7 @@ export function TimelineStep({
       <FormField
         control={form.control}
         name={currentQuestion.name as any}
-        render={({ field }) => (
+        render={({ field, fieldState }) => (
           <FormItem>
             <FormLabel className="text-xl font-semibold mb-4 block">{currentQuestion.label}</FormLabel>
             <AnimatePresence mode="wait" initial={false}>
@@ -177,13 +198,15 @@ export function TimelineStep({
 }
 
 export function useTimelineForm() {
+  const { formData } = useAppSelector((state) => state.challenge);
+  
   return useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      enrollmentStartDate: undefined,
-      enrollmentEndDate: undefined,
-      activeStartDate: undefined,
-      activeEndDate: undefined,
+      enrollmentStartDate: formData.timeline?.enrollmentStartDate ? new Date(formData.timeline.enrollmentStartDate) : undefined,
+      enrollmentEndDate: formData.timeline?.enrollmentEndDate ? new Date(formData.timeline.enrollmentEndDate) : undefined,
+      activeStartDate: formData.timeline?.activeStartDate ? new Date(formData.timeline.activeStartDate) : undefined,
+      activeEndDate: formData.timeline?.activeEndDate ? new Date(formData.timeline.activeEndDate) : undefined,
     },
     mode: 'onChange',
   });

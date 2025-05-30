@@ -4,6 +4,8 @@ import * as z from 'zod';
 import { useEffect } from 'react';
 import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { updateFormData } from '@/store/challengeSlice';
 
 const formSchema = z.object({
   cohort: z.string().min(1, 'Cohort is required'),
@@ -25,10 +27,12 @@ const questions = [
 ];
 
 export function useEligibilityForm() {
+  const { formData } = useAppSelector((state) => state.challenge);
+  
   return useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      cohort: '',
+      cohort: formData.eligibility?.otherRequirements || '',
     },
     mode: 'onChange',
   });
@@ -36,11 +40,32 @@ export function useEligibilityForm() {
 export const ELIGIBILITY_TOTAL = questions.length;
 
 export function EligibilityStep({ subStep, form }: { subStep: number; form: ReturnType<typeof useEligibilityForm> }) {
+  const dispatch = useAppDispatch();
+  const { formData } = useAppSelector((state) => state.challenge);
+
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      dispatch(updateFormData({
+        eligibility: {
+          ageRange: { min: 0, max: 100 },
+          gender: [],
+          location: [],
+          healthConditions: [],
+          otherRequirements: value.cohort || '',
+        }
+      }));
+    });
+    return () => subscription.unsubscribe();
+  }, [form, dispatch]);
+
   useEffect(() => {
     const el = document.querySelector('select,button[aria-pressed]');
     if (el) (el as HTMLElement).focus();
   }, [subStep]);
+
   const currentQuestion = questions[subStep];
+  const currentValue = form.watch(currentQuestion.name as any);
+
   return (
     <Form {...form}>
       <FormField
@@ -57,7 +82,7 @@ export function EligibilityStep({ subStep, form }: { subStep: number; form: Retu
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentQuestion.render(field, form, fieldState)}
+                {currentQuestion.render({ ...field, value: currentValue }, form, fieldState)}
               </motion.div>
             </AnimatePresence>
             <FormMessage />

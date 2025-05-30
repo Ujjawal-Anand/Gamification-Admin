@@ -5,6 +5,8 @@ import { useEffect } from 'react';
 import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { ModernTextInput } from '../ModernTextInput';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { updateFormData } from '@/store/challengeSlice';
 
 const formSchema = z.object({
   headline: z.string().min(1, 'Headline is required'),
@@ -59,13 +61,15 @@ const questions = [
 ];
 
 export function useDetailsForm() {
+  const { formData } = useAppSelector((state) => state.challenge);
+  
   return useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      headline: '',
-      summary: '',
-      image: '',
-      heroImage: '',
+      headline: formData.details?.description || '',
+      summary: formData.details?.website || '',
+      image: formData.details?.image || '',
+      heroImage: formData.details?.video || '',
     },
     mode: 'onChange',
   });
@@ -73,11 +77,31 @@ export function useDetailsForm() {
 export const DETAILS_TOTAL = questions.length;
 
 export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnType<typeof useDetailsForm> }) {
+  const dispatch = useAppDispatch();
+  const { formData } = useAppSelector((state) => state.challenge);
+
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      dispatch(updateFormData({
+        details: {
+          description: value.headline || '',
+          image: value.image || '',
+          video: value.heroImage || '',
+          website: value.summary || '',
+        }
+      }));
+    });
+    return () => subscription.unsubscribe();
+  }, [form, dispatch]);
+
   useEffect(() => {
     const el = document.querySelector('input,button[aria-pressed]');
     if (el) (el as HTMLElement).focus();
   }, [subStep]);
+
   const currentQuestion = questions[subStep];
+  const currentValue = form.watch(currentQuestion.name as any);
+
   return (
     <Form {...form}>
       <FormField
@@ -94,7 +118,7 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentQuestion.render(field, form, fieldState)}
+                {currentQuestion.render({ ...field, value: currentValue }, form, fieldState)}
               </motion.div>
             </AnimatePresence>
             <FormMessage />

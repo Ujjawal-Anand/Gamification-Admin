@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, UseFormReturn } from 'react-hook-form';
 import * as z from 'zod';
 import { useEffect, useState } from 'react';
 import {
@@ -28,6 +28,8 @@ import { BottomSheetInfo } from '../BottomSheetInfo';
 import { VerticalImportanceSlider } from '../VerticalImportanceSlider';
 import { ModernTextInput } from '../ModernTextInput';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { updateFormData } from "@/store/challengeSlice";
 
 const formSchema = z.object({
   category: z.enum(['Activity', 'Nutrition', 'Mindfulness', 'Sleep'], {
@@ -40,6 +42,8 @@ const formSchema = z.object({
     required_error: 'Please select importance level',
   }),
   name: z.string().min(1, 'Challenge name is required').max(40, 'Maximum 40 characters allowed'),
+  description: z.string().min(1, 'Description is required'),
+  type: z.string().min(1, 'Type is required'),
 });
 
 const categoryThemes = {
@@ -79,13 +83,28 @@ const themeOptions: Record<string, { value: string; label: string; icon: React.R
   ],
 };
 
-export function BasicInformationStep({
-  subStep,
-  form,
-}: {
+interface BasicInformationStepProps {
   subStep: number;
-  form: ReturnType<typeof useForm<z.infer<typeof formSchema>>>;
-}) {
+  form: UseFormReturn<z.infer<typeof formSchema>>;
+}
+
+export function BasicInformationStep({ subStep }: { subStep: number }) {
+  const dispatch = useAppDispatch();
+  const { formData } = useAppSelector((state) => state.challenge);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: formData.basicInformation?.name || '',
+      description: formData.basicInformation?.description || '',
+      category: formData.basicInformation?.category,
+      theme: formData.basicInformation?.theme || '',
+      importance: formData.basicInformation?.importance || '',
+      type: formData.basicInformation?.type || '',
+    },
+    mode: 'onChange',
+  });
+
   // Info sheet state for theme
   const [infoTheme, setInfoTheme] = useState<null | { label: string; description: string; icon?: React.ReactNode }>(null);
 
@@ -102,8 +121,7 @@ export function BasicInformationStep({
       label: 'What is the name of your challenge?',
       render: (field: any, _form: any, fieldState: any) => (
         <ModernTextInput
-          value={field.value || ''}
-          onChange={field.onChange}
+          {...field}
           maxLength={40}
           error={fieldState?.error?.message}
           label="Challenge Name"
@@ -148,6 +166,17 @@ export function BasicInformationStep({
   ];
 
   const currentQuestion = questions[subStep];
+  const currentValue = form.watch(currentQuestion.name as any);
+  console.log('Current Question:', currentQuestion.name, 'Value:', currentValue);
+
+  // Update Redux store when form values change
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      console.log('Form value changed:', value);
+      dispatch(updateFormData({ basicInformation: value as z.infer<typeof formSchema> }));
+    });
+    return () => subscription.unsubscribe();
+  }, [form, dispatch]);
 
   // Custom render for theme question to inject info icon logic
   if (currentQuestion.name === 'theme') {
@@ -192,23 +221,28 @@ export function BasicInformationStep({
       <FormField
         control={form.control}
         name={currentQuestion.name as any}
-        render={({ field, fieldState }) => (
-          <FormItem>
-            <FormLabel className="text-xl font-semibold mb-4 block">{currentQuestion.label}</FormLabel>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={currentQuestion.name}
-                initial={{ opacity: 0, x: 40 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -40 }}
-                transition={{ duration: 0.3 }}
-              >
-                {currentQuestion.render(field, form, fieldState)}
-              </motion.div>
-            </AnimatePresence>
-            <FormMessage />
-          </FormItem>
-        )}
+        render={({ field, fieldState }) => {
+          console.log('Field state:', fieldState);
+          return (
+            <FormItem>
+              <FormLabel className="text-xl font-semibold mb-4 block">
+                {currentQuestion.label}
+              </FormLabel>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={currentQuestion.name}
+                  initial={{ opacity: 0, x: 40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -40 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {currentQuestion.render(field, form, fieldState)}
+                </motion.div>
+              </AnimatePresence>
+              <FormMessage />
+            </FormItem>
+          );
+        }}
       />
     </Form>
   );
@@ -222,6 +256,8 @@ export function useBasicInformationForm() {
       category: undefined,
       theme: '',
       importance: '',
+      description: '',
+      type: '',
     },
     mode: 'onChange',
   });
