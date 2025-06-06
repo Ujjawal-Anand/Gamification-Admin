@@ -37,13 +37,12 @@ const formSchema = z.object({
   }),
   theme: z.string({
     required_error: 'Please select a theme',
+  }).refine((val) => val !== '', {
+    message: 'Please select a theme',
   }),
   importance: z.string({
     required_error: 'Please select importance level',
   }),
-  name: z.string().min(1, 'Challenge name is required').max(40, 'Maximum 40 characters allowed'),
-  description: z.string().min(1, 'Description is required'),
-  type: z.string().min(1, 'Type is required'),
 });
 
 const categoryThemes = {
@@ -54,7 +53,7 @@ const categoryThemes = {
 };
 
 export const TOTAL_SUBSTEPS = Object.keys(categoryThemes).length;
-export const BASIC_INFO_TOTAL = 4;
+export const BASIC_INFO_TOTAL = 3;
 
 const categoryOptions = [
   { value: 'Activity', label: 'Activity', icon: <Dumbbell /> },
@@ -95,12 +94,9 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: formData.basicInformation?.name || '',
-      description: formData.basicInformation?.description || '',
       category: formData.basicInformation?.category,
-      theme: formData.basicInformation?.theme || '',
+      theme: '',
       importance: formData.basicInformation?.importance || '',
-      type: formData.basicInformation?.type || '',
     },
     mode: 'onChange',
   });
@@ -117,22 +113,9 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
   // Questions array must be inside the component to access setInfoTheme
   const questions = [
     {
-      name: 'name',
-      label: 'What is the name of your challenge?',
-      render: (field: any, _form: any, fieldState: any) => (
-        <ModernTextInput
-          {...field}
-          maxLength={40}
-          error={fieldState?.error?.message}
-          label="Challenge Name"
-          placeholder="Enter challenge name"
-        />
-      ),
-    },
-    {
       name: 'category',
       label: 'Which category best fits your challenge?',
-      render: (field: any) => (
+      render: (field: any, _form: any, _fieldState: any) => (
         <SelectableCardGrid
           options={categoryOptions}
           value={field.value}
@@ -143,14 +126,18 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
     {
       name: 'theme',
       label: 'Select a theme for your challenge',
-      render: (field: any, form: any) => {
+      subtitle: 'Choose a theme that best matches your challenge goals and objectives',
+      render: (field: any, form: any, _fieldState: any) => {
         const selectedCategory = form.watch('category');
         if (!selectedCategory) return <div className="text-muted-foreground">Select a category first</div>;
         return (
           <SelectableCardGrid
             options={themeOptions[selectedCategory]}
             value={field.value}
-            onChange={field.onChange}
+            onChange={(value) => {
+              field.onChange(value);
+              form.trigger('theme'); // Trigger validation after change
+            }}
             onInfoClick={(option) => setInfoTheme({ label: option.label, description: option.description || '', icon: option.icon })}
           />
         );
@@ -159,7 +146,7 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
     {
       name: 'importance',
       label: 'How important is this challenge?',
-      render: (field: any) => (
+      render: (field: any, _form: any, _fieldState: any) => (
         <VerticalImportanceSlider value={field.value} onChange={field.onChange} />
       ),
     },
@@ -187,14 +174,17 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
           <FormField
             control={form.control}
             name={currentQuestion.name as any}
-            render={({ field }) => (
+            render={({ field, fieldState }) => (
               <FormItem>
                 <FormLabel className="text-xl font-semibold mb-4 block">{currentQuestion.label}</FormLabel>
                 {selectedCategory ? (
                   <SelectableCardGrid
                     options={themeOptions[selectedCategory]}
                     value={field.value}
-                    onChange={field.onChange}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      form.trigger('theme'); // Trigger validation after change
+                    }}
                     onInfoClick={(option) => setInfoTheme({ label: option.label, description: option.description || '', icon: option.icon })}
                   />
                 ) : (
@@ -221,13 +211,12 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
       <FormField
         control={form.control}
         name={currentQuestion.name as any}
-        render={({ field, fieldState }) => {
-          console.log('Field state:', fieldState);
-          return (
+        render={({ field, fieldState }) => (
             <FormItem>
-              <FormLabel className="text-xl font-semibold mb-4 block">
-                {currentQuestion.label}
-              </FormLabel>
+            <FormLabel className="text-xl font-semibold mb-2 block">{currentQuestion.label}</FormLabel>
+            {currentQuestion.subtitle && (
+              <p className="text-muted-foreground mb-4">{currentQuestion.subtitle}</p>
+            )}
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={currentQuestion.name}
@@ -241,8 +230,7 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
               </AnimatePresence>
               <FormMessage />
             </FormItem>
-          );
-        }}
+        )}
       />
     </Form>
   );
@@ -252,12 +240,9 @@ export function useBasicInformationForm() {
   return useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
       category: undefined,
       theme: '',
       importance: '',
-      description: '',
-      type: '',
     },
     mode: 'onChange',
   });

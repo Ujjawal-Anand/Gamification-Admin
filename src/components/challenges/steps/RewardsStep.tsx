@@ -1,148 +1,271 @@
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useEffect } from 'react';
-import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { ModernTextInput } from '../ModernTextInput';
-import { SelectableCardGrid } from '../SelectableCardGrid';
-import { Trophy, Star, Gift, Award } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useForm, UseFormReturn } from 'react-hook-form';
+import * as z from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { updateFormData } from '@/store/challengeSlice';
+import { ModernTextInput, ModernSelect, ModernMultiSelect } from '@/components/ui/modern-input';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { Trophy, Medal, Star, Award, Crown, Target } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BottomSheetInfo } from '@/components/challenges/BottomSheetInfo';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 const formSchema = z.object({
-  rewardTypes: z.array(z.string()).min(1, 'Please select at least one reward type'),
-  points: z.string().optional(),
-  badge: z.string().optional(),
-  sponsoredReward: z.string().optional(),
+  rewardTypes: z.array(z.string()).min(1, 'At least one reward type is required'),
+  points: z.number().optional(),
+  badgeId: z.string().optional(),
+}).refine((data) => {
+  // Only validate points if points type is selected
+  // if (data.rewardTypes.includes('points')) {
+  //   if (!data.points) {
+  //     return false;
+  //   }
+  // }
+  // // Only validate badge if badge type is selected
+  // if (data.rewardTypes.includes('badge')) {
+  //   if (!data.badgeId) {
+  //     return false;
+  //   }
+  // }
+  return true;
+}, {
+  message: "Please complete the reward details for your selected reward types",
+  path: ["rewardTypes"]
 });
 
-const rewardOptions = [
-  { value: 'points', label: 'Points', icon: <Trophy />, description: 'Award points to participants' },
-  { value: 'badge', label: 'Badge', icon: <Star />, description: 'Award a special badge' },
-  { value: 'sponsored', label: 'Sponsored Reward', icon: <Gift />, description: 'Offer a sponsored reward' },
+interface RewardsFormData {
+  rewardTypes: string[];
+  points?: number;
+  badgeId?: string;
+}
+
+// Mock data for badges - replace with actual API call
+const challengeBadges = [
+  { 
+    value: 'badge1', 
+    label: 'Challenge Master',
+    icon: Trophy,
+    description: 'Awarded for completing multiple challenges'
+  },
+  { 
+    value: 'badge2', 
+    label: 'Health Champion',
+    icon: Medal,
+    description: 'Achieved for maintaining healthy habits'
+  },
+  { 
+    value: 'badge3', 
+    label: 'Wellness Warrior',
+    icon: Star,
+    description: 'Earned through consistent wellness activities'
+  },
+  { 
+    value: 'badge4', 
+    label: 'Fitness Pro',
+    icon: Award,
+    description: 'Given for exceptional fitness achievements'
+  },
+  { 
+    value: 'badge5', 
+    label: 'Wellness Leader',
+    icon: Crown,
+    description: 'Awarded for leading wellness initiatives'
+  },
+  { 
+    value: 'badge6', 
+    label: 'Goal Achiever',
+    icon: Target,
+    description: 'Earned by reaching significant milestones'
+  },
 ];
+
+// Create a separate component for the badge selection
+function BadgeSelection({ field, fieldState }: { field: any; fieldState: any }) {
+  const [selectedBadge, setSelectedBadge] = useState<typeof challengeBadges[0] | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-6 mt-8">
+        {challengeBadges.map((badge) => {
+          const Icon = badge.icon;
+          return (
+            <div
+              key={badge.value}
+              onClick={() => {
+                setSelectedBadge(badge);
+                setIsSheetOpen(true);
+              }}
+              className={cn(
+                'flex flex-col items-center p-6 rounded-xl cursor-pointer transition-all',
+                'hover:bg-primary/5 hover:scale-105',
+                field.value === badge.value
+                  ? 'bg-primary/10 border-2 border-primary'
+                  : 'border-2 border-transparent'
+              )}
+            >
+              <div className={cn(
+                'p-4 rounded-full mb-4',
+                field.value === badge.value ? 'bg-primary/20' : 'bg-muted'
+              )}>
+                <Icon className={cn(
+                  'w-12 h-12',
+                  field.value === badge.value ? 'text-primary' : 'text-muted-foreground'
+                )} />
+              </div>
+              <h3 className="text-lg font-semibold text-center">{badge.label}</h3>
+            </div>
+          );
+        })}
+      </div>
+
+      <BottomSheetInfo
+        open={isSheetOpen}
+        onOpenChange={setIsSheetOpen}
+        icon={selectedBadge?.icon && <selectedBadge.icon className="w-16 h-16 text-primary" />}
+        title={selectedBadge?.label || ''}
+        subtitle="Badge Details"
+        description={selectedBadge?.description}
+      >
+        <div className="w-full mt-6">
+          <Button 
+            className="w-full" 
+            onClick={() => {
+              if (selectedBadge) {
+                field.onChange(selectedBadge.value);
+                setIsSheetOpen(false);
+              }
+            }}
+          >
+            Select Badge
+          </Button>
+        </div>
+      </BottomSheetInfo>
+    </>
+  );
+}
 
 const questions = [
   {
     name: 'rewardTypes',
     label: 'What types of rewards will you offer?',
-    render: (field: any, form: any) => {
-      const selectedRewards = form.watch('rewardTypes') || [];
-      return (
-        <SelectableCardGrid
-          options={rewardOptions}
-          value={field.value}
-          onChange={(value) => {
-            const currentValues = form.getValues('rewardTypes') || [];
-            if (currentValues.includes(value)) {
-              field.onChange(currentValues.filter((v: string) => v !== value));
-            } else {
-              field.onChange([...currentValues, value]);
-            }
-          }}
-        />
-      );
-    },
+    subtitle: 'Select at least one type of reward that participants will receive upon completing the challenge',
+    render: (field: any, _form: any, fieldState: any) => (
+      <ModernMultiSelect
+        value={field.value || []}
+        onChange={field.onChange}
+        error={fieldState?.error?.message}
+        label="Reward Types"
+        options={[
+          { value: 'points', label: 'Points' },
+          { value: 'badge', label: 'Badge' },
+        ]}
+      />
+    ),
   },
   {
     name: 'points',
-    label: 'How many points will participants earn?',
+    label: 'How many healthy points will participants earn?',
+    subtitle: 'Enter the number of points that will be awarded upon challenge completion',
     render: (field: any, _form: any, fieldState: any) => (
-      <div className="w-full">
-        <label className="block text-sm text-muted-foreground mb-2">Points</label>
-        <Input
-          type="number"
-          value={field.value || ''}
-          onChange={field.onChange}
-          placeholder="Enter points value"
-          className={fieldState?.error?.message ? 'border-red-500' : ''}
-        />
-        {fieldState?.error?.message && (
-          <div className="text-xs text-red-500 mt-1">{fieldState.error.message}</div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex items-center space-x-4">
+          <Input
+            type="number"
+            value={field.value || ''}
+            onChange={(e) => {
+              const value = parseFloat(e.target.value);
+              field.onChange(isNaN(value) ? 0 : value);
+            }}
+            className={cn(
+              'w-32 text-5xl text-center py-4 focus:outline-none transition-all bg-transparent font-bold border-none',
+              fieldState?.error ? 'text-destructive' : 'text-foreground'
+            )}
+            placeholder="Enter points"
+          />
+          <span className="text-3xl font-bold">Points</span>
+        </div>
+        {fieldState?.error && (
+          <p className="text-sm text-destructive mt-2 text-center">{fieldState.error.message}</p>
         )}
       </div>
     ),
-    shouldShow: (form: any) => form.watch('rewardTypes')?.includes('points'),
   },
   {
-    name: 'badge',
-    label: 'What badge will participants receive?',
+    name: 'badgeId',
+    label: 'Which badge will participants earn?',
+    subtitle: 'Select the badge that will be awarded upon challenge completion',
     render: (field: any, _form: any, fieldState: any) => (
-      <ModernTextInput
-        value={field.value || ''}
-        onChange={field.onChange}
-        error={fieldState?.error?.message}
-        label="Badge Name"
-        placeholder="Enter badge name"
-      />
+      <BadgeSelection field={field} fieldState={fieldState} />
     ),
-    shouldShow: (form: any) => form.watch('rewardTypes')?.includes('badge'),
-  },
-  {
-    name: 'sponsoredReward',
-    label: 'What is the sponsored reward?',
-    render: (field: any, _form: any, fieldState: any) => (
-      <ModernTextInput
-        value={field.value || ''}
-        onChange={field.onChange}
-        error={fieldState?.error?.message}
-        label="Sponsored Reward"
-        placeholder="Enter sponsored reward details"
-      />
-    ),
-    shouldShow: (form: any) => form.watch('rewardTypes')?.includes('sponsored'),
   },
 ];
 
-export function useRewardsForm() {
-  return useForm({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      rewardTypes: [],
-      points: '',
-      badge: '',
-      sponsoredReward: '',
-    },
-    mode: 'onChange',
-  });
+interface RewardsStepProps {
+  subStep: number;
+  form: UseFormReturn<RewardsFormData>;
+  onAdvanceSubStep: () => void;
 }
 
-export function RewardsStep({
-  subStep,
-  form,
-  onAdvanceSubStep,
-}: {
-  subStep: number;
-  form: ReturnType<typeof useRewardsForm>;
-  onAdvanceSubStep?: () => void;
-}) {
-  // Filter visible questions based on selected reward types
-  const visibleQuestions = questions.filter(q => !q.shouldShow || q.shouldShow(form));
-  const currentQuestion = visibleQuestions[subStep];
+const RewardsStep = ({ subStep, form, onAdvanceSubStep }: RewardsStepProps) => {
+  const dispatch = useAppDispatch();
+  const { rewards } = useAppSelector((state) => state.challenge.formData);
+  const selectedRewardTypes = form.watch('rewardTypes') || [];
 
-  // Track previous visibleQuestions length to detect when a new reward type is added
-  const prevVisibleQuestionsRef = React.useRef(visibleQuestions.length);
-  React.useEffect(() => {
-    prevVisibleQuestionsRef.current = visibleQuestions.length;
-  }, [visibleQuestions.length]);
+  // Ensure subStep is within bounds
+  const validSubStep = Math.min(subStep, questions.length - 1);
+  const currentQuestion = questions[validSubStep];
+  const currentValue = form.watch(currentQuestion.name as keyof RewardsFormData);
 
-  // Focus the first input/select on subStep change
   useEffect(() => {
-    const el = document.querySelector('input,select,button[aria-pressed]');
-    if (el) (el as HTMLElement).focus();
-  }, [subStep]);
+    const subscription = form.watch((value) => {
+      dispatch(updateFormData({ 
+        rewards: {
+          types: (value.rewardTypes || []).filter((type): type is string => type !== undefined),
+          points: value.points,
+          badgeId: value.badgeId
+        } 
+      }));
+    });
+    return () => subscription.unsubscribe();
+  }, [form, dispatch]);
 
-  if (!currentQuestion) return null;
+  // Handle step advancement based on selected reward types
+  useEffect(() => {
+    if (currentQuestion.name === 'points' && !selectedRewardTypes.includes('points')) {
+      onAdvanceSubStep();
+    } else if (currentQuestion.name === 'badgeId' && !selectedRewardTypes.includes('badge')) {
+      onAdvanceSubStep();
+    }
+  }, [currentQuestion.name, selectedRewardTypes, onAdvanceSubStep]);
+
+  // If we're beyond the last question, advance to the next step
+  if (subStep >= questions.length) {
+    onAdvanceSubStep();
+    return null;
+  }
 
   return (
     <Form {...form}>
       <FormField
         control={form.control}
         name={currentQuestion.name as any}
-        render={({ field }) => (
+        render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel className="text-xl font-semibold mb-4 block">{currentQuestion.label}</FormLabel>
+            <FormLabel className="text-xl font-semibold mb-2 block">{currentQuestion.label}</FormLabel>
+            {currentQuestion.subtitle && (
+              <p className="text-muted-foreground mb-4">{currentQuestion.subtitle}</p>
+            )}
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={currentQuestion.name}
@@ -151,36 +274,7 @@ export function RewardsStep({
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentQuestion.name === 'rewardTypes' ? (
-                  <SelectableCardGrid
-                    options={rewardOptions}
-                    value={field.value}
-                    onChange={(value) => {
-                      const currentValues = form.getValues('rewardTypes') || [];
-                      let newValues;
-                      if (currentValues.includes(value)) {
-                        newValues = currentValues.filter((v: string) => v !== value);
-                      } else {
-                        newValues = [...currentValues, value];
-                      }
-                      field.onChange(newValues);
-                      setTimeout(() => {
-                        const newVisibleQuestions = questions.filter(q => !q.shouldShow || q.shouldShow({ ...form, watch: (name: string) => {
-                          if (name === 'rewardTypes') return newValues;
-                          return form.watch(name as any);
-                        }}));
-                        if (
-                          onAdvanceSubStep &&
-                          newVisibleQuestions.length > prevVisibleQuestionsRef.current
-                        ) {
-                          onAdvanceSubStep();
-                        }
-                      }, 0);
-                    }}
-                  />
-                ) : (
-                  currentQuestion.render(field, form, form.formState.errors[currentQuestion.name as keyof typeof form.formState.errors])
-                )}
+                {currentQuestion.render({ ...field, value: currentValue }, form, fieldState)}
               </motion.div>
             </AnimatePresence>
             <FormMessage />
@@ -189,8 +283,20 @@ export function RewardsStep({
       />
     </Form>
   );
+};
+
+export function useRewardsForm() {
+  const { rewards } = useAppSelector((state) => state.challenge.formData);
+  
+  return useForm<RewardsFormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      rewardTypes: rewards?.types || [],
+      points: rewards?.points,
+      badgeId: rewards?.badgeId,
+    },
+    mode: 'onChange',
+  });
 }
 
-export function getRewardsVisibleQuestions(form: ReturnType<typeof useRewardsForm>) {
-  return questions.filter(q => !q.shouldShow || q.shouldShow(form));
-} 
+export default RewardsStep; 

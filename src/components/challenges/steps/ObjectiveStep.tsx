@@ -8,10 +8,18 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateFormData } from '@/store/challengeSlice';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 // Define the base schema that all challenge types will have
 const baseSchema = {
-  objective: z.string().min(1, 'Objective is required'),
+  objective: z.union([
+    z.string(),
+    z.object({
+      value: z.number(),
+      unit: z.enum(['kilometers', 'miles', 'steps'])
+    })
+  ]),
   measurement: z.string().optional(),
   trackingPeriod: z.string().optional(),
   squaresRequired: z.string().optional(),
@@ -25,7 +33,10 @@ const getFormSchema = (category: string, theme: string) => {
     case 'Distance':
       return z.object({
         ...baseSchema,
-        measurement: z.enum(['Miles', 'Kilometers']),
+        objective: z.object({
+          value: z.number().min(1, 'Please enter a valid distance'),
+          unit: z.enum(['kilometers', 'miles'])
+        }),
       });
     case 'Steps':
       return z.object({
@@ -61,7 +72,7 @@ const getFormSchema = (category: string, theme: string) => {
     case 'The Most':
       return z.object({
         ...baseSchema,
-        measurement: z.enum(['Miles', 'Steps']),
+        measurement: z.enum(['miles', 'steps']),
         trackingPeriod: z.enum(['Daily', 'Total']),
       });
     default:
@@ -76,30 +87,48 @@ const getObjectiveQuestions = (category: string, theme: string) => {
     case 'Distance':
       baseQuestions.push({
         name: 'objective',
-        label: 'What is the total distance required?',
+        label: 'Enter distance',
+        subtitle: 'Set the target distance for participants to achieve',
         render: (field: any, _form: any, fieldState: any) => (
-          <ModernTextInput
-            value={field.value || ''}
-            onChange={field.onChange}
-            error={fieldState?.error?.message}
-            label="Distance"
-            placeholder="Enter distance"
-            type="number"
-          />
-        ),
-      }, {
-        name: 'measurement',
-        label: 'Select measurement unit',
-        render: (field: any, _form: any, fieldState: any) => (
-          <Select value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select unit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Miles">Miles</SelectItem>
-              <SelectItem value="Kilometers">Kilometers</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center justify-center min-h-[60vh] space-x-4">
+            <div className="flex items-center space-x-4">
+              <Input
+                type="number"
+                value={field.value?.value || ''}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  field.onChange({ 
+                    value: isNaN(value) ? 0 : value,
+                    unit: field.value?.unit || 'kilometers'
+                  });
+                }}
+                className={cn(
+                  'w-32 text-5xl text-center py-4 focus:outline-none transition-all bg-transparent font-bold border-none',
+                  fieldState?.error ? 'text-destructive' : 'text-foreground'
+                )}
+                placeholder="Enter distance"
+              />
+              <Select
+                value={field.value?.unit || 'kilometers'}
+                onValueChange={(value) => field.onChange({ 
+                  value: field.value?.value || 0,
+                  unit: value 
+                })}
+              >
+                <SelectTrigger className="w-24 h-16 bg-transparent border-none focus:ring-0 text-3xl font-bold">
+                  <SelectValue placeholder="KM" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kilometers" className="text-2xl">KM</SelectItem>
+                  <SelectItem value="miles" className="text-2xl">MI</SelectItem>
+                  <SelectItem value="steps" className="text-2xl">ST</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {fieldState?.error && (
+              <p className="text-sm text-destructive mt-2 text-center">{fieldState.error.message}</p>
+            )}
+          </div>
         ),
       });
       break;
@@ -108,6 +137,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'objective',
         label: 'What is the total number of steps required?',
+        subtitle: 'Define the primary goal that participants should achieve through this challenge',
         render: (field: any, _form: any, fieldState: any) => (
           <ModernTextInput
             value={field.value || ''}
@@ -121,6 +151,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       }, {
         name: 'trackingPeriod',
         label: 'How should steps be tracked?',
+        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
         render: (field: any, _form: any, fieldState: any) => (
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger>
@@ -139,6 +170,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'objective',
         label: 'What is the total number of steps required?',
+        subtitle: 'Define the primary goal that participants should achieve through this challenge',
         render: (field: any, _form: any, fieldState: any) => (
           <ModernTextInput
             value={field.value || ''}
@@ -152,6 +184,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       }, {
         name: 'trackingPeriod',
         label: 'How should steps be tracked?',
+        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
         render: (field: any, _form: any, fieldState: any) => (
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger>
@@ -170,6 +203,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'squaresRequired',
         label: 'How many squares are required to complete?',
+        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
         render: (field: any, _form: any, fieldState: any) => (
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger>
@@ -189,6 +223,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'dailyChallenges',
         label: 'How many daily challenges must be completed?',
+        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
         render: (field: any, _form: any, fieldState: any) => (
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger>
@@ -208,6 +243,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'questionsRequired',
         label: 'How many questions must be answered?',
+        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
         render: (field: any, _form: any, fieldState: any) => (
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger>
@@ -227,7 +263,9 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'objective',
         label: 'What is the total required?',
-        render: (field: any, _form: any, fieldState: any) => (
+        subtitle: 'Define the primary goal that participants should achieve through this challenge',
+        render: (field: any, form: any, fieldState: any) => (
+          <div className="flex gap-4">
           <ModernTextInput
             value={field.value || ''}
             onChange={field.onChange}
@@ -236,24 +274,24 @@ const getObjectiveQuestions = (category: string, theme: string) => {
             placeholder="Enter total"
             type="number"
           />
-        ),
-      }, {
-        name: 'measurement',
-        label: 'Select measurement type',
-        render: (field: any, _form: any, fieldState: any) => (
-          <Select value={field.value} onValueChange={field.onChange}>
+            <Select
+              value={form.watch('measurement')}
+              onValueChange={val => form.setValue('measurement', val)}
+            >
             <SelectTrigger>
               <SelectValue placeholder="Select measurement" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Miles">Miles</SelectItem>
-              <SelectItem value="Steps">Steps</SelectItem>
+              <SelectItem value="miles">Miles</SelectItem>
+              <SelectItem value="steps">Steps</SelectItem>
             </SelectContent>
           </Select>
+          </div>
         ),
       }, {
         name: 'trackingPeriod',
         label: 'How should it be tracked?',
+        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
         render: (field: any, _form: any, fieldState: any) => (
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger>
@@ -272,16 +310,34 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'objective',
         label: 'What is the main objective of this challenge?',
+        subtitle: 'Define the primary goal that participants should achieve through this challenge',
         render: (field: any, _form: any, fieldState: any) => (
           <ModernTextInput
             value={field.value || ''}
             onChange={field.onChange}
             error={fieldState?.error?.message}
             label="Objective"
-            placeholder="Describe the objective"
+            placeholder="Enter the main objective"
+            maxLength={200}
           />
         ),
-      });
+      },
+      {
+        name: 'successCriteria',
+        label: 'How will you measure success?',
+        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
+        render: (field: any, _form: any, fieldState: any) => (
+          <ModernTextInput
+            value={field.value || ''}
+            onChange={field.onChange}
+            error={fieldState?.error?.message}
+            label="Success Criteria"
+            placeholder="Enter success criteria"
+            maxLength={200}
+          />
+        ),
+      },
+    );
   }
 
   return baseQuestions;
@@ -303,7 +359,10 @@ export function useObjectiveForm() {
   return useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      objective: formData.objective?.primaryGoal || '',
+      objective: theme === 'Distance' ? {
+        value: 0,
+        unit: 'kilometers'
+      } : formData.objective?.primaryGoal || '',
       measurement: formData.objective?.measurement || '',
       trackingPeriod: formData.objective?.trackingPeriod || '',
       squaresRequired: formData.objective?.squaresRequired || '5',
@@ -326,20 +385,36 @@ export function ObjectiveStep({ subStep, form }: { subStep: number; form: Return
 
   useEffect(() => {
     const subscription = form.watch((value) => {
-      console.log('Objective Form Values:', value);
-      dispatch(updateFormData({
-        objective: {
-          primaryGoal: value.objective || '',
-          measurement: value.measurement || '',
-          trackingPeriod: value.trackingPeriod || '',
-          squaresRequired: value.squaresRequired || '',
-          dailyChallenges: value.dailyChallenges || '',
-          questionsRequired: value.questionsRequired || '',
-        }
-      }));
+      if (theme === 'Distance' && typeof value.objective === 'object' && value.objective?.value && value.objective?.unit) {
+        dispatch(updateFormData({
+          objective: {
+            objective: value.objective.value.toString(),
+            successCriteria: value.objective.unit,
+            primaryGoal: value.objective.value.toString(),
+            measurement: value.objective.unit,
+            trackingPeriod: formData.objective?.trackingPeriod || '',
+            squaresRequired: formData.objective?.squaresRequired || '',
+            dailyChallenges: formData.objective?.dailyChallenges || '',
+            questionsRequired: formData.objective?.questionsRequired || ''
+          }
+        }));
+      } else {
+        dispatch(updateFormData({
+          objective: {
+            objective: typeof value.objective === 'string' ? value.objective : '',
+            successCriteria: value.measurement || '',
+            primaryGoal: typeof value.objective === 'string' ? value.objective : '',
+            measurement: value.measurement || '',
+            trackingPeriod: value.trackingPeriod || '',
+            squaresRequired: value.squaresRequired || '',
+            dailyChallenges: value.dailyChallenges || '',
+            questionsRequired: value.questionsRequired || ''
+          }
+        }));
+      }
     });
     return () => subscription.unsubscribe();
-  }, [form, dispatch]);
+  }, [form, dispatch, theme, formData.objective]);
 
   useEffect(() => {
     const el = document.querySelector('input,button[aria-pressed],select');
@@ -357,7 +432,10 @@ export function ObjectiveStep({ subStep, form }: { subStep: number; form: Return
         name={currentQuestion.name as any}
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel className="text-xl font-semibold mb-4 block">{currentQuestion.label}</FormLabel>
+            <FormLabel className="text-xl font-semibold mb-2 block">{currentQuestion.label}</FormLabel>
+            {currentQuestion.subtitle && (
+              <p className="text-muted-foreground mb-4">{currentQuestion.subtitle}</p>
+            )}
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={currentQuestion.name}

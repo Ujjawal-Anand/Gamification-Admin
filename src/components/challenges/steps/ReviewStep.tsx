@@ -2,18 +2,16 @@ import { useAppSelector } from '@/store/hooks';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2 } from 'lucide-react';
-import { ChallengeFormData } from '@/store/challengeSlice';
 
 export function ReviewStep() {
   const { formData } = useAppSelector((state) => state.challenge);
-  const { basicInformation, objective, timeline, details, rewards, eligibility, features } = formData;
+  const { basicInformation, objective, details, rewards, features } = formData;
 
   const sections = [
     {
       title: 'Basic Information',
       data: basicInformation,
       fields: [
-        { label: 'Name', key: 'name' },
         { label: 'Category', key: 'category' },
         { label: 'Theme', key: 'theme' },
         { label: 'Importance', key: 'importance' },
@@ -32,54 +30,32 @@ export function ReviewStep() {
       ],
     },
     {
-      title: 'Timeline',
-      data: timeline,
-      fields: [
-        { label: 'Enrollment Start', key: 'enrollmentStartDate' },
-        { label: 'Enrollment End', key: 'enrollmentEndDate' },
-        { label: 'Active Start', key: 'activeStartDate' },
-        { label: 'Active End', key: 'activeEndDate' },
-      ],
-    },
-    {
       title: 'Details',
       data: details,
       fields: [
-        { label: 'Description', key: 'description' },
+        { label: 'Name', key: 'name' },
+        { label: 'Headline', key: 'headline' },
+        { label: 'Summary', key: 'summary' },
         { label: 'Image', key: 'image' },
-        { label: 'Video', key: 'video' },
-        { label: 'Website', key: 'website' },
+        { label: 'Hero Image', key: 'heroImage' },
       ],
     },
     {
       title: 'Rewards',
       data: rewards,
       fields: [
-        { label: 'Type', key: 'type' },
-        { label: 'Description', key: 'description' },
-        { label: 'Value', key: 'value' },
-        { label: 'Eligibility', key: 'eligibility' },
-      ],
-    },
-    {
-      title: 'Eligibility',
-      data: eligibility,
-      fields: [
-        { label: 'Age Range', key: 'ageRange' },
-        { label: 'Gender', key: 'gender' },
-        { label: 'Location', key: 'location' },
-        { label: 'Health Conditions', key: 'healthConditions' },
-        { label: 'Other Requirements', key: 'otherRequirements' },
+        { label: 'Reward Types', key: 'rewardTypes' },
+        { label: 'Points', key: 'points' },
+        { label: 'Badge', key: 'badgeId' },
       ],
     },
     {
       title: 'Features',
       data: features,
       fields: [
-        { label: 'Tracking', key: 'tracking' },
-        { label: 'Social', key: 'social' },
-        { label: 'Gamification', key: 'gamification' },
-        { label: 'Support', key: 'support' },
+        { label: 'Next Best Actions', key: 'nextBestActions' },
+        { label: 'Nutrition Widget', key: 'nutritionWidget' },
+        { label: 'Recipe Diet', key: 'recipeDiet' },
       ],
     },
   ];
