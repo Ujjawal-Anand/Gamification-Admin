@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { ModernTextInput } from '../ModernTextInput';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -11,6 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { CheckCircle2 } from 'lucide-react';
+import { UseFormReturn } from 'react-hook-form';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
 
 // Define the base schema that all challenge types will have
 const baseSchema = {
@@ -33,7 +37,7 @@ const baseSchema = {
 };
 
 // Define the schema based on challenge type
-const getFormSchema = (category: string, theme: string) => {
+const getFormSchema = (theme: string) => {
   switch (theme) {
     case 'Distance':
       return z.object({
@@ -59,7 +63,10 @@ const getFormSchema = (category: string, theme: string) => {
     case 'Bingo':
       return z.object({
         ...baseSchema,
-        squaresRequired: z.string().min(1, 'Number of squares is required'),
+        squaresRequired: z.string().refine((val) => {
+          const num = parseInt(val);
+          return !isNaN(num) && num >= 5 && num <= 20;
+        }, 'Please select a valid number of squares'),
       });
     case 'Mini Challenge':
       return z.object({
@@ -164,7 +171,7 @@ const getObjectiveQuestions = (category: string, theme: string) => {
                       });
                     }}
                     className={cn(
-                      'w-48 text-[4rem] leading-none text-center focus:outline-none transition-all bg-transparent font-bold border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 [&>input]:text-[4rem] [&>input]:h-auto [&>input]:py-0',
+                      'w-48 text-5xl leading-none text-center focus:outline-none transition-all bg-transparent font-bold border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 [&>input]:text-[4rem] [&>input]:h-auto [&>input]:py-0',
                       fieldState?.error?.message ? 'text-destructive' : 'text-foreground'
                     )}
                     placeholder="Enter"
@@ -179,32 +186,67 @@ const getObjectiveQuestions = (category: string, theme: string) => {
               <div className="space-y-4">
                 <p className="text-lg font-medium text-center">Track steps</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <Button
-                    type="button"
-                    variant={field.value?.trackingPeriod === 'Day' ? 'default' : 'outline'}
-                    className="h-24 text-lg"
-                    onClick={() => {
-                      field.onChange({
-                        ...field.value,
-                        trackingPeriod: 'Day'
-                      });
-                    }}
-                  >
-                    Daily
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={field.value?.trackingPeriod === 'Total' ? 'default' : 'outline'}
-                    className="h-24 text-lg"
-                    onClick={() => {
-                      field.onChange({
-                        ...field.value,
-                        trackingPeriod: 'Total'
-                      });
-                    }}
-                  >
-                    Total
-                  </Button>
+                  <div className="relative perspective-1000">
+                    <div className={cn(
+                      "relative w-full h-24 transition-transform duration-500 transform-style-3d",
+                      field.value?.trackingPeriod === 'Day' ? 'rotate-y-180' : ''
+                    )}>
+                      {/* Front of card */}
+                      <div className="absolute inset-0 backface-hidden">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full h-full text-lg"
+                          onClick={() => {
+                            field.onChange({
+                              ...field.value,
+                              trackingPeriod: 'Day'
+                            });
+                          }}
+                        >
+                          Daily
+                        </Button>
+                      </div>
+                      {/* Back of card */}
+                      <div className="absolute inset-0 backface-hidden rotate-y-180 bg-primary text-primary-foreground rounded-md flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <CheckCircle2 className="h-8 w-8" />
+                          <span className="text-lg font-medium">Daily</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative perspective-1000">
+                    <div className={cn(
+                      "relative w-full h-24 transition-transform duration-500 transform-style-3d",
+                      field.value?.trackingPeriod === 'Total' ? 'rotate-y-180' : ''
+                    )}>
+                      {/* Front of card */}
+                      <div className="absolute inset-0 backface-hidden">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full h-full text-lg"
+                          onClick={() => {
+                            field.onChange({
+                              ...field.value,
+                              trackingPeriod: 'Total'
+                            });
+                          }}
+                        >
+                          Total
+                        </Button>
+                      </div>
+                      {/* Back of card */}
+                      <div className="absolute inset-0 backface-hidden rotate-y-180 bg-primary text-primary-foreground rounded-md flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <CheckCircle2 className="h-8 w-8" />
+                          <span className="text-lg font-medium">Total</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 {fieldState?.error?.message && (
                   <p className="text-sm text-destructive text-center">{fieldState.error.message}</p>
@@ -253,18 +295,46 @@ const getObjectiveQuestions = (category: string, theme: string) => {
       baseQuestions.push({
         name: 'squaresRequired',
         label: 'How many squares are required to complete?',
-        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
+        subtitle: 'Specify the number of squares needed to complete the bingo challenge',
         render: (field: any, _form: any, fieldState: any) => (
-          <Select value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select number of squares" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 21 }, (_, i) => i + 5).map((num) => (
-                <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="w-full max-w-2xl space-y-8">
+              <div className="grid grid-cols-4 gap-4">
+                {Array.from({ length: 16 }, (_, i) => i + 5).map((num) => (
+                  <div key={num} className="relative perspective-1000">
+                    <div className={cn(
+                      "relative w-full aspect-square transition-transform duration-500 transform-style-3d",
+                      field.value === num.toString() ? 'rotate-y-180' : ''
+                    )}>
+                      {/* Front of card */}
+                      <div className="absolute inset-0 backface-hidden">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full h-full text-2xl font-bold"
+                          onClick={() => {
+                            field.onChange(num.toString());
+                          }}
+                        >
+                          {num}
+                        </Button>
+                      </div>
+                      {/* Back of card */}
+                      <div className="absolute inset-0 backface-hidden rotate-y-180 bg-primary text-primary-foreground rounded-md flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <CheckCircle2 className="h-8 w-8" />
+                          <span className="text-2xl font-bold">{num}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {fieldState?.error?.message && (
+                <p className="text-sm text-destructive text-center">{fieldState.error.message}</p>
+              )}
+            </div>
+          </div>
         ),
       });
       break;
@@ -398,129 +468,236 @@ export const getObjectiveTotal = (category: string, theme: string) => {
   return getObjectiveQuestions(category, theme).length;
 };
 
-export function useObjectiveForm() {
-  const { formData } = useAppSelector((state) => state.challenge);
-  const category = formData.basicInformation?.category;
-  const theme = formData.basicInformation?.theme;
-  
-  const formSchema = getFormSchema(category || '', theme || '');
-  type FormData = z.infer<typeof formSchema>;
-  
-  return useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      objective: theme === 'Distance' ? {
-        value: 0,
-        unit: 'kilometers'
-      } : formData.objective?.primaryGoal || '',
-      measurement: formData.objective?.measurement || '',
-      trackingPeriod: formData.objective?.trackingPeriod || '',
-      squaresRequired: formData.objective?.squaresRequired || '',
-      dailyChallenges: formData.objective?.dailyChallenges || '',
-      questionsRequired: formData.objective?.questionsRequired || '',
-    },
-    mode: 'onChange',
-  });
+interface ObjectiveStepProps {
+  subStep: number;
+  form: UseFormReturn<any>;
 }
 
-export function ObjectiveStep({ subStep, form }: { subStep: number; form: ReturnType<typeof useObjectiveForm> }) {
+interface StoredObjective {
+  objective?: string;
+  measurement?: string;
+  trackingPeriod?: string;
+  squaresRequired?: string;
+  dailyChallenges?: string;
+  questionsRequired?: string;
+  rawData?: any;
+}
+
+export function useObjectiveForm() {
   const dispatch = useAppDispatch();
   const { formData } = useAppSelector((state) => state.challenge);
-  const category = formData.basicInformation?.category;
-  const theme = formData.basicInformation?.theme;
+  const category = formData.basicInformation?.category || '';
+  const theme = formData.basicInformation?.theme || '';
+  const storedObjective: StoredObjective = formData?.objective || {};
 
-  const questions = getObjectiveQuestions(category || '', theme || '');
-  const formSchema = getFormSchema(category || '', theme || '');
-  type FormData = z.infer<typeof formSchema>;
+  // Initialize form with stored data
+  const defaultValues = useMemo(() => {
+    if (storedObjective.rawData) {
+      return storedObjective.rawData;
+    }
 
+    switch (theme) {
+      case 'Bingo':
+        return {
+          squaresRequired: storedObjective.squaresRequired || '',
+          trackingPeriod: storedObjective.trackingPeriod || ''
+        };
+      case 'Steps':
+        return {
+          objective: {
+            steps: storedObjective.objective?.split(' ')[0] || 0,
+            trackingPeriod: storedObjective.trackingPeriod || 'Day'
+          }
+        };
+      case 'Distance':
+        const storedValue = storedObjective.objective?.split(' ')[0];
+        const storedUnit = storedObjective.objective?.split(' ')[1] || 'kilometers';
+        return {
+          objective: {
+            value: storedValue ? Number(storedValue) : '',
+            unit: storedUnit
+          }
+        };
+      default:
+        return {
+          objective: storedObjective.objective || '',
+          measurement: storedObjective.measurement || '',
+          trackingPeriod: storedObjective.trackingPeriod || '',
+          squaresRequired: storedObjective.squaresRequired || '',
+          dailyChallenges: storedObjective.dailyChallenges || '',
+          questionsRequired: storedObjective.questionsRequired || ''
+        };
+    }
+  }, [storedObjective, theme]);
+
+  // Initialize form
+  const form = useForm({
+    defaultValues,
+    mode: 'onChange',
+    resolver: zodResolver(getFormSchema(theme))
+  });
+
+  // Watch form values
+  const { watch } = form;
+  const objectiveValue = watch('objective');
+  const squaresRequired = watch('squaresRequired');
+
+  // Validation helpers
+  const isBingoValid = theme === 'Bingo' ? Boolean(squaresRequired) : true;
+  const isDistanceValid = theme === 'Distance' ? 
+    Boolean(objectiveValue?.value) && objectiveValue?.value !== 0 && Boolean(objectiveValue?.unit) : true;
+  const isStepsValid = theme === 'Steps' ? 
+    Boolean(objectiveValue?.steps) && Boolean(objectiveValue?.trackingPeriod) : true;
+
+  // Handle form changes and dispatch updates
   useEffect(() => {
-    const subscription = form.watch((value) => {
-      if (theme === 'Distance' && typeof value.objective === 'object' && 'value' in value.objective && value.objective.value && value.objective.unit) {
-        dispatch(updateFormData({
-          objective: {
-            objective: value.objective.value.toString(),
-            successCriteria: value.objective.unit,
-            primaryGoal: value.objective.value.toString(),
-            measurement: value.objective.unit,
-            trackingPeriod: formData.objective?.trackingPeriod || '',
-            squaresRequired: formData.objective?.squaresRequired || '',
-            dailyChallenges: formData.objective?.dailyChallenges || '',
-            questionsRequired: formData.objective?.questionsRequired || ''
+    const subscription = watch((data) => {
+      if (!data) return;
+
+      let formattedObjective = '';
+      let measurement = '';
+      let objectiveData = {};
+      
+      switch (theme) {
+        case 'Distance':
+          if (data.objective?.value && data.objective.value !== 0) {
+            formattedObjective = `${data.objective.value} ${data.objective.unit}`;
+            measurement = data.objective.unit;
+            objectiveData = {
+              value: data.objective.value,
+              unit: data.objective.unit
+            };
           }
-        }));
-      } else if (theme === 'Steps' && typeof value.objective === 'object' && 'steps' in value.objective && value.objective.steps) {
-        dispatch(updateFormData({
-          objective: {
-            objective: value.objective.steps.toString(),
-            successCriteria: value.measurement || '',
-            primaryGoal: value.objective.steps.toString(),
-            measurement: value.measurement || '',
-            trackingPeriod: value.trackingPeriod || '',
-            squaresRequired: formData.objective?.squaresRequired || '',
-            dailyChallenges: formData.objective?.dailyChallenges || '',
-            questionsRequired: formData.objective?.questionsRequired || ''
+          break;
+        case 'Steps':
+          if (data.objective?.steps) {
+            formattedObjective = `${data.objective.steps} steps`;
+            measurement = 'steps';
+            objectiveData = {
+              steps: data.objective.steps,
+              trackingPeriod: data.objective.trackingPeriod
+            };
           }
-        }));
-      } else {
-        dispatch(updateFormData({
-          objective: {
-            objective: typeof value.objective === 'string' ? value.objective : '',
-            successCriteria: value.measurement || '',
-            primaryGoal: typeof value.objective === 'string' ? value.objective : '',
-            measurement: value.measurement || '',
-            trackingPeriod: value.trackingPeriod || '',
-            squaresRequired: value.squaresRequired || '',
-            dailyChallenges: value.dailyChallenges || '',
-            questionsRequired: value.questionsRequired || ''
+          break;
+        case 'Bingo':
+          if (data.squaresRequired) {
+            formattedObjective = `${data.squaresRequired} squares`;
+            measurement = 'squares';
+            objectiveData = {
+              squaresRequired: data.squaresRequired
+            };
           }
-        }));
+          break;
+        case 'Mini Challenge':
+          if (data.dailyChallenges) {
+            formattedObjective = `${data.dailyChallenges} challenges`;
+            measurement = 'challenges';
+            objectiveData = {
+              dailyChallenges: data.dailyChallenges
+            };
+          }
+          break;
+        case 'Nutrition Quiz':
+          if (data.questionsRequired) {
+            formattedObjective = `${data.questionsRequired} questions`;
+            measurement = 'questions';
+            objectiveData = {
+              questionsRequired: data.questionsRequired
+            };
+          }
+          break;
+        default:
+          if (data.objective) {
+            formattedObjective = data.objective;
+            measurement = data.measurement || '';
+            objectiveData = {
+              objective: data.objective
+            };
+          }
+      }
+
+      if (formattedObjective) {
+        const finalObjectiveData = {
+          objective: {
+            objective: formattedObjective,
+            measurement: measurement,
+            trackingPeriod: data.trackingPeriod || '',
+            squaresRequired: data.squaresRequired || '',
+            dailyChallenges: data.dailyChallenges || '',
+            questionsRequired: data.questionsRequired || '',
+            rawData: {
+              ...data,
+              theme: theme,
+              objectiveData: objectiveData
+            }
+          }
+        };
+        
+        dispatch(updateFormData(finalObjectiveData));
       }
     });
+
     return () => subscription.unsubscribe();
-  }, [form, dispatch, theme, formData.objective]);
+  }, [watch, theme, dispatch]);
 
-  useEffect(() => {
-    const el = document.querySelector('input,button[aria-pressed],select');
-    if (el) (el as HTMLElement).focus();
-  }, [subStep]);
+  return form;
+}
 
-  const currentQuestion = questions[subStep];
-  const currentValue = form.watch(currentQuestion.name as keyof FormData);
-  console.log('Current Question:', currentQuestion.name, 'Value:', currentValue, 'Form State:', form.formState);
+export function ObjectiveStep({ subStep, form }: ObjectiveStepProps) {
+  const { formData } = useAppSelector((state) => state.challenge);
+  const category = formData.basicInformation?.category || '';
+  const theme = formData.basicInformation?.theme || '';
 
-  return (
-    <Form {...form}>
+  const questions = getObjectiveQuestions(category, theme);
+
+  const renderQuestions = () => {
+    return questions.map((question) => (
       <FormField
+        key={question.name}
         control={form.control}
-        name={currentQuestion.name as any}
+        name={question.name as any}
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel className="text-xl font-semibold mb-2 block">{currentQuestion.label}</FormLabel>
-            {currentQuestion.subtitle && (
-              <p className="text-muted-foreground mb-4">{currentQuestion.subtitle}</p>
+            <FormLabel className="text-xl font-semibold mb-2 block">{question.label}</FormLabel>
+            {question.subtitle && (
+              <p className="text-muted-foreground mb-4">{question.subtitle}</p>
             )}
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={currentQuestion.name}
+                key={question.name}
                 initial={{ opacity: 0, x: 40 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentQuestion.render(
+                {question.render(
                   { 
                     ...field, 
-                    value: typeof currentValue === 'object' ? currentValue : field.value 
+                    value: typeof field.value === 'object' ? field.value : field.value 
                   }, 
                   form, 
                   fieldState
                 )}
               </motion.div>
             </AnimatePresence>
-            <FormMessage />
+            {fieldState.error && (
+              <p className="text-sm text-destructive mt-2">{fieldState.error.message}</p>
+            )}
           </FormItem>
         )}
       />
-    </Form>
+    ));
+  };
+
+  return (
+    <div className="flex flex-col items-center min-h-screen bg-background">
+      <div className="w-full max-w-2xl">
+        <Form {...form}>
+          <form className="space-y-8">
+            {renderQuestions()}
+          </form>
+        </Form>
+      </div>
+    </div>
   );
 } 

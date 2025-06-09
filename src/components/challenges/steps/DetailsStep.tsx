@@ -344,7 +344,7 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
                       {/* Preview Section */}
                       <div
                         className={cn(
-                          "border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors",
+                          "border-2 border-dashed rounded-3xl p-2 text-center cursor-pointer hover:border-primary/50 transition-colors",
                           fieldState.error && "border-destructive"
                         )}
                         onClick={() => handleBrowse(field.name as 'image' | 'heroImage')}

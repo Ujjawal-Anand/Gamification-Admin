@@ -8,6 +8,7 @@ export interface RootState {
     currentSubStep: number;
     isSubmitting: boolean;
     error: string | null;
+    id: string | undefined;
   };
 }
 

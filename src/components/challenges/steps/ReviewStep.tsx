@@ -45,10 +45,22 @@ interface FormData {
   };
 }
 
+interface FieldConfig {
+  label: string;
+  key: string;
+  showIf?: (data: any) => boolean;
+}
+
+interface SectionConfig {
+  title: string;
+  data: any;
+  fields: FieldConfig[];
+}
+
 export function ReviewStep() {
   const { formData } = useAppSelector((state) => state.challenge);
 
-  const sections = [
+  const sections: SectionConfig[] = [
     {
       title: 'Basic Information',
       data: formData.basicInformation,
@@ -65,7 +77,7 @@ export function ReviewStep() {
         { label: 'Primary Goal', key: 'objective' },
         { label: 'Measurement', key: 'measurement' },
         { label: 'Tracking Period', key: 'trackingPeriod' },
-        { label: 'Squares Required', key: 'squaresRequired' },
+        { label: 'Squares Required', key: 'squaresRequired', showIf: (data: any) => data?.theme === 'Bingo' },
         { label: 'Daily Challenges', key: 'dailyChallenges' },
         { label: 'Questions Required', key: 'questionsRequired' },
       ],
@@ -101,6 +113,47 @@ export function ReviewStep() {
     },
   ];
 
+  const getValue = (data: any, key: string) => {
+    if (!data) return null;
+    const value = data[key as keyof typeof data];
+    if (value === undefined || value === null || value === '') return null;
+    
+    // Special handling for objective field
+    if (key === 'objective') {
+      if (typeof value === 'object') {
+        // Check if we have rawData with objectiveData
+        if (value.rawData?.objectiveData) {
+          return value.rawData.objectiveData;
+        }
+        
+        // Fallback to checking specific fields
+        if ('squaresRequired' in value) {
+          return { squaresRequired: value.squaresRequired };
+        }
+        if ('steps' in value) {
+          return { steps: value.steps, trackingPeriod: value.trackingPeriod };
+        }
+        if ('value' in value && 'unit' in value) {
+          return { value: value.value, unit: value.unit };
+        }
+        if ('dailyChallenges' in value) {
+          return { dailyChallenges: value.dailyChallenges };
+        }
+        if ('questionsRequired' in value) {
+          return { questionsRequired: value.questionsRequired };
+        }
+      }
+      return value;
+    }
+
+    // Special handling for squaresRequired field
+    if (key === 'squaresRequired') {
+      return { squaresRequired: value };
+    }
+    
+    return value;
+  };
+
   const formatValue = (value: any): string => {
     if (value === null || value === undefined) return '';
     if (Array.isArray(value)) return value.join(', ');
@@ -108,18 +161,26 @@ export function ReviewStep() {
       if ('min' in value && 'max' in value) {
         return `${value.min} - ${value.max}`;
       }
+      if ('steps' in value) {
+        return `${value.steps} steps${value.trackingPeriod ? ` (${value.trackingPeriod})` : ''}`;
+      }
+      if ('value' in value && 'unit' in value) {
+        return `${value.value} ${value.unit}`;
+      }
+      if ('squaresRequired' in value) {
+        return `${value.squaresRequired} squares`;
+      }
+      if ('dailyChallenges' in value) {
+        return `${value.dailyChallenges} challenges`;
+      }
+      if ('questionsRequired' in value) {
+        return `${value.questionsRequired} questions`;
+      }
       return Object.entries(value)
         .map(([k, v]) => `${k}: ${v}`)
         .join(', ');
     }
     return String(value);
-  };
-
-  const getValue = (data: any, key: string) => {
-    if (!data) return null;
-    const value = data[key as keyof typeof data];
-    if (value === undefined || value === null || value === '') return null;
-    return value;
   };
 
   return (
@@ -135,6 +196,9 @@ export function ReviewStep() {
             <h3 className="text-xl font-semibold mb-4">{section.title}</h3>
             <div className="space-y-4">
               {section.fields.map((field) => {
+                // Skip field if it has a showIf condition that evaluates to false
+                if (field.showIf && !field.showIf(section.data)) return null;
+                
                 const value = getValue(section.data, field.key);
                 if (!value) return null;
 
@@ -155,60 +219,7 @@ export function ReviewStep() {
         ))}
       </div>
 
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Objective</h3>
-        <div className="space-y-2">
-          {formData.objective?.objective && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Goal</span>
-              <span className="font-medium">
-                {(() => {
-                  const obj = formData.objective?.objective as any;
-                  if (obj.steps) return `${obj.steps} Steps`;
-                  if (obj.distance) return `${obj.distance} ${obj.unit}`;
-                  if (obj.squaresRequired) return `${obj.squaresRequired} Squares`;
-                  if (obj.dailyChallenges) return `${obj.dailyChallenges} Challenges`;
-                  if (obj.questionsRequired) return `${obj.questionsRequired} Questions`;
-                  return '';
-                })()}
-              </span>
-            </div>
-          )}
-          {formData.objective?.measurement && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Measurement</span>
-              <span className="font-medium">{formData.objective.measurement}</span>
-            </div>
-          )}
-          {formData.objective?.trackingPeriod && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tracking Period</span>
-              <span className="font-medium">{formData.objective.trackingPeriod}</span>
-            </div>
-          )}
-          {/* Only show Bingo-specific fields if theme is Bingo */}
-          {formData.basicInformation?.theme === 'Bingo' && formData.objective?.squaresRequired && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Squares Required</span>
-              <span className="font-medium">{formData.objective.squaresRequired}</span>
-            </div>
-          )}
-          {/* Only show Daily Challenge-specific fields if theme is Daily Challenge */}
-          {formData.basicInformation?.theme === 'Daily Challenge' && formData.objective?.dailyChallenges && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Daily Challenges</span>
-              <span className="font-medium">{formData.objective.dailyChallenges}</span>
-            </div>
-          )}
-          {/* Only show Quiz-specific fields if theme is Quiz */}
-          {formData.basicInformation?.theme === 'Quiz' && formData.objective?.questionsRequired && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Questions Required</span>
-              <span className="font-medium">{formData.objective.questionsRequired}</span>
-            </div>
-          )}
-        </div>
-      </div>
+     
 
       <div className="flex justify-end gap-4 mt-8">
         <Button variant="outline">Save as Draft</Button>

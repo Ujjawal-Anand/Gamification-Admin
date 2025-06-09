@@ -51,51 +51,111 @@ export interface ChallengeFormData {
   };
 }
 
-const initialState = {
-  formData: {} as Partial<ChallengeFormData>,
+interface ChallengeState {
+  id: string;
+  currentStep: number;
+  currentSubStep: number;
+  formData: {
+    basicInformation?: {
+      category?: string;
+      theme?: string;
+      importance?: string;
+    };
+    objective?: {
+      objective?: string;
+      measurement?: string;
+      trackingPeriod?: string;
+      squaresRequired?: string;
+      dailyChallenges?: string;
+      questionsRequired?: string;
+      rawData?: any;
+    };
+    details?: any;
+    rewards?: any;
+    features?: any;
+  };
+}
+
+const initialState: ChallengeState = {
+  id: '',
   currentStep: 0,
   currentSubStep: 0,
-  isSubmitting: false,
-  error: null as string | null,
+  formData: {
+    basicInformation: {},
+    objective: {},
+    details: {},
+    rewards: {},
+    features: {},
+  },
 };
 
 const challengeSlice = createSlice({
   name: 'challenge',
   initialState,
   reducers: {
-    updateFormData: (state, action: PayloadAction<Partial<ChallengeFormData>>) => {
-      state.formData = { ...state.formData, ...action.payload };
+    setChallengeId: (state, action: PayloadAction<string>) => {
+      state.id = action.payload;
     },
     setCurrentStep: (state, action: PayloadAction<number>) => {
       state.currentStep = action.payload;
-      state.currentSubStep = 0; // Reset subStep when changing main step
     },
     setCurrentSubStep: (state, action: PayloadAction<number>) => {
       state.currentSubStep = action.payload;
     },
-    setSubmitting: (state, action: PayloadAction<boolean>) => {
-      state.isSubmitting = action.payload;
+    updateFormData: (state, action: PayloadAction<any>) => {
+      console.log('Redux: Updating form data with:', action.payload);
+      
+      // Handle objective data specifically
+      if (action.payload.objective) {
+        console.log('Redux: Processing objective data:', action.payload.objective);
+        state.formData.objective = {
+          ...state.formData.objective,
+          ...action.payload.objective,
+          // Ensure all fields are strings
+          objective: String(action.payload.objective.objective || ''),
+          measurement: String(action.payload.objective.measurement || ''),
+          trackingPeriod: String(action.payload.objective.trackingPeriod || ''),
+          squaresRequired: String(action.payload.objective.squaresRequired || ''),
+          dailyChallenges: String(action.payload.objective.dailyChallenges || ''),
+          questionsRequired: String(action.payload.objective.questionsRequired || ''),
+          rawData: action.payload.objective.rawData || {}
+        };
+        console.log('Redux: Updated objective state:', state.formData.objective);
+      }
+
+      // Update other form data
+      Object.keys(action.payload).forEach(key => {
+        if (key !== 'objective') {
+          state.formData[key as keyof typeof state.formData] = {
+            ...state.formData[key as keyof typeof state.formData],
+            ...action.payload[key]
+          };
+        }
+      });
+
+      console.log('Redux: Final form data state:', state.formData);
     },
-    setError: (state, action: PayloadAction<string | null>) => {
-      state.error = action.payload;
-    },
-    resetForm: (state) => {
-      state.formData = {} as Partial<ChallengeFormData>;
+    resetChallenge: (state) => {
+      state.id = '';
       state.currentStep = 0;
       state.currentSubStep = 0;
-      state.isSubmitting = false;
-      state.error = null;
+      state.formData = {
+        basicInformation: {},
+        objective: {},
+        details: {},
+        rewards: {},
+        features: {},
+      };
     },
   },
 });
 
-export const {
-  updateFormData,
-  setCurrentStep,
-  setCurrentSubStep,
-  setSubmitting,
-  setError,
-  resetForm,
+export const { 
+  setChallengeId,
+  setCurrentStep, 
+  setCurrentSubStep, 
+  updateFormData, 
+  resetChallenge 
 } = challengeSlice.actions;
 
 export default challengeSlice.reducer; 

@@ -8,7 +8,7 @@ import { updateFormData } from '@/store/challengeSlice';
 import { ModernTextInput, ModernSelect, ModernMultiSelect } from '@/components/ui/modern-input';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Trophy, Medal, Star, Award, Crown, Target } from 'lucide-react';
+import { Trophy, Medal, Star, Award, Crown, Target, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BottomSheetInfo } from '@/components/challenges/BottomSheetInfo';
 import {
@@ -161,16 +161,91 @@ const questions = [
     label: 'What types of rewards will you offer?',
     subtitle: 'Select at least one type of reward that participants will receive upon completing the challenge',
     render: (field: any, _form: any, fieldState: any) => (
-      <ModernMultiSelect
-        value={field.value || []}
-        onChange={field.onChange}
-        error={fieldState?.error?.message}
-        label="Reward Types"
-        options={[
-          { value: 'points', label: 'Points' },
-          { value: 'badge', label: 'Badge' },
-        ]}
-      />
+      <div className="grid grid-cols-2 gap-6 mt-8">
+        <div
+          onClick={() => {
+            const newValue = field.value?.includes('points')
+              ? field.value.filter((v: string) => v !== 'points')
+              : [...(field.value || []), 'points'];
+            field.onChange(newValue);
+          }}
+          className={cn(
+            'relative cursor-pointer transition-all duration-300',
+            field.value?.includes('points') 
+              ? 'scale-[1.02] shadow-lg' 
+              : 'hover:scale-[1.01] hover:shadow-md'
+          )}
+        >
+          <div className={cn(
+            "w-full aspect-square rounded-xl border-2 transition-colors duration-300 flex flex-col items-center justify-center p-6 relative",
+            field.value?.includes('points')
+              ? "bg-primary/10 border-primary"
+              : "bg-background border-input hover:border-primary/50"
+          )}>
+            {field.value?.includes('points') && (
+              <CheckCircle2 className="h-6 w-6 text-primary absolute top-3 right-3" />
+            )}
+            <Trophy className={cn(
+              "w-16 h-16 mb-4",
+              field.value?.includes('points') ? "text-primary" : "text-muted-foreground"
+            )} />
+            <h3 className={cn(
+              "text-xl font-semibold text-center",
+              field.value?.includes('points') ? "text-primary" : "text-foreground"
+            )}>
+              Points
+            </h3>
+            <p className={cn(
+              "text-sm text-center mt-2",
+              field.value?.includes('points') ? "text-primary/80" : "text-muted-foreground"
+            )}>
+              Award healthy points to participants
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => {
+            const newValue = field.value?.includes('badge')
+              ? field.value.filter((v: string) => v !== 'badge')
+              : [...(field.value || []), 'badge'];
+            field.onChange(newValue);
+          }}
+          className={cn(
+            'relative cursor-pointer transition-all duration-300',
+            field.value?.includes('badge') 
+              ? 'scale-[1.02] shadow-lg' 
+              : 'hover:scale-[1.01] hover:shadow-md'
+          )}
+        >
+          <div className={cn(
+            "w-full aspect-square rounded-xl border-2 transition-colors duration-300 flex flex-col items-center justify-center p-6 relative",
+            field.value?.includes('badge')
+              ? "bg-primary/10 border-primary"
+              : "bg-background border-input hover:border-primary/50"
+          )}>
+            {field.value?.includes('badge') && (
+              <CheckCircle2 className="h-6 w-6 text-primary absolute top-3 right-3" />
+            )}
+            <Medal className={cn(
+              "w-16 h-16 mb-4",
+              field.value?.includes('badge') ? "text-primary" : "text-muted-foreground"
+            )} />
+            <h3 className={cn(
+              "text-xl font-semibold text-center",
+              field.value?.includes('badge') ? "text-primary" : "text-foreground"
+            )}>
+              Badge
+            </h3>
+            <p className={cn(
+              "text-sm text-center mt-2",
+              field.value?.includes('badge') ? "text-primary/80" : "text-muted-foreground"
+            )}>
+              Award a special achievement badge
+            </p>
+          </div>
+        </div>
+      </div>
     ),
   },
   {

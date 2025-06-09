@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateFormData } from '@/store/challengeSlice';
 import { cn } from '@/lib/utils';
+import { CheckCircle2 } from 'lucide-react';
 
 const formSchema = z.object({
   nextBestActions: z.array(z.string()).min(1, 'Select at least one next best action'),
@@ -175,16 +176,101 @@ const questions = [
     label: 'What next best actions will appear on the active challenge page?',
     subtitle: 'Select the next best actions that will be shown to participants',
     render: (field: any, _form: any, fieldState: any) => (
-      <ModernMultiSelect
-        value={field.value || []}
-        onChange={field.onChange}
-        error={fieldState?.error?.message}
-        label="Next Best Actions"
-        options={[
-          { value: 'Nutrition Widget', label: 'Nutrition Widget' },
-          { value: 'Recipes', label: 'Recipes' },
-        ]}
-      />
+      <div className="grid grid-cols-1 gap-6 mt-8">
+        <div
+          onClick={() => {
+            const newValue = field.value?.includes('Nutrition Widget')
+              ? field.value.filter((v: string) => v !== 'Nutrition Widget')
+              : [...(field.value || []), 'Nutrition Widget'];
+            field.onChange(newValue);
+          }}
+          className={cn(
+            'relative cursor-pointer transition-all duration-300',
+            field.value?.includes('Nutrition Widget') 
+              ? 'scale-[1.02] shadow-lg' 
+              : 'hover:scale-[1.01] hover:shadow-md'
+          )}
+        >
+          <div className={cn(
+            "w-full aspect-[2/1] rounded-xl border-2 transition-colors duration-300 flex items-center p-6 gap-6",
+            field.value?.includes('Nutrition Widget')
+              ? "bg-primary/10 border-primary"
+              : "bg-background border-input hover:border-primary/50"
+          )}>
+            <div className="w-16 h-16 flex items-center justify-center">
+              <span className="text-4xl">🥗</span>
+            </div>
+            <div className="flex-1">
+              <h3 className={cn(
+                "text-xl font-semibold",
+                field.value?.includes('Nutrition Widget') 
+                  ? 'text-primary' 
+                  : 'text-foreground'
+              )}>
+                Nutrition Widget
+              </h3>
+              <p className={cn(
+                "text-sm mt-2",
+                field.value?.includes('Nutrition Widget')
+                  ? 'text-primary/80'
+                  : 'text-muted-foreground'
+              )}>
+                Show nutrition tracking and recommendations
+              </p>
+            </div>
+            {field.value?.includes('Nutrition Widget') && (
+              <CheckCircle2 className="h-8 w-8 text-primary" />
+            )}
+          </div>
+        </div>
+
+        <div
+          onClick={() => {
+            const newValue = field.value?.includes('Recipes')
+              ? field.value.filter((v: string) => v !== 'Recipes')
+              : [...(field.value || []), 'Recipes'];
+            field.onChange(newValue);
+          }}
+          className={cn(
+            'relative cursor-pointer transition-all duration-300',
+            field.value?.includes('Recipes') 
+              ? 'scale-[1.02] shadow-lg' 
+              : 'hover:scale-[1.01] hover:shadow-md'
+          )}
+        >
+          <div className={cn(
+            "w-full aspect-[2/1] rounded-xl border-2 transition-colors duration-300 flex items-center p-6 gap-6",
+            field.value?.includes('Recipes')
+              ? "bg-primary/10 border-primary"
+              : "bg-background border-input hover:border-primary/50"
+          )}>
+            <div className="w-16 h-16 flex items-center justify-center">
+              <span className="text-4xl">🍳</span>
+            </div>
+            <div className="flex-1">
+              <h3 className={cn(
+                "text-xl font-semibold",
+                field.value?.includes('Recipes') 
+                  ? 'text-primary' 
+                  : 'text-foreground'
+              )}>
+                Recipes
+              </h3>
+              <p className={cn(
+                "text-sm mt-2",
+                field.value?.includes('Recipes')
+                  ? 'text-primary/80'
+                  : 'text-muted-foreground'
+              )}>
+                Show personalized recipe recommendations
+              </p>
+            </div>
+            {field.value?.includes('Recipes') && (
+              <CheckCircle2 className="h-8 w-8 text-primary" />
+            )}
+          </div>
+        </div>
+      </div>
     ),
   },
   {
