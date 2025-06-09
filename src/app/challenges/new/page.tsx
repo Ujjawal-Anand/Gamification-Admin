@@ -1,28 +1,42 @@
 'use client';
 
 import { ChallengeCreationWizard } from '@/components/challenges/ChallengeCreationWizard';
-import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
-import { useAppDispatch } from '@/store/hooks';
-import { setCurrentStep, setCurrentSubStep } from '@/store/challengeSlice';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { initChallenge } from '@/store/challengeSlice';
 
 export default function NewChallengePage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const dispatch = useAppDispatch();
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const initialized = useRef(false);
 
-  // Set initial step and substep from URL
+  // Generate and set challenge ID if not present
   useEffect(() => {
-    const step = searchParams.get('step');
-    const substep = searchParams.get('substep');
+    if (initialized.current) return;
     
-    if (step && !isNaN(Number(step))) {
-      dispatch(setCurrentStep(Number(step)));
+    const challengeId = searchParams.get('id');
+    if (!challengeId) {
+      const newId = crypto.randomUUID();
+      
+      // Update URL using history API
+      const newUrl = `?id=${newId}`;
+      window.history.replaceState({}, '', newUrl);
+      
+      // Initialize new challenge with ID
+      dispatch(initChallenge(newId));
+    } else {
+      // Initialize challenge if it doesn't exist
+      const existingChallenge = challenges.find(c => c.id === challengeId);
+      if (!existingChallenge) {
+        dispatch(initChallenge(challengeId));
+      }
     }
     
-    if (substep && !isNaN(Number(substep))) {
-      dispatch(setCurrentSubStep(Number(substep)));
-    }
-  }, [searchParams, dispatch]);
+    initialized.current = true;
+  }, [searchParams, router, dispatch]);
 
   return <ChallengeCreationWizard />;
 } 

@@ -19,6 +19,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { useSearchParams } from 'next/navigation';
 
 const formSchema = z.object({
   rewardTypes: z.array(z.string()).min(1, 'At least one reward type is required'),
@@ -294,7 +295,10 @@ interface RewardsStepProps {
 
 const RewardsStep = ({ subStep, form, onAdvanceSubStep }: RewardsStepProps) => {
   const dispatch = useAppDispatch();
-  const { rewards } = useAppSelector((state) => state.challenge.formData);
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
   const selectedRewardTypes = form.watch('rewardTypes') || [];
 
   // Ensure subStep is within bounds
@@ -307,16 +311,19 @@ const RewardsStep = ({ subStep, form, onAdvanceSubStep }: RewardsStepProps) => {
 
   useEffect(() => {
     const subscription = form.watch((value) => {
-      dispatch(updateFormData({ 
-        rewards: {
-          types: (value.rewardTypes || []).filter((type): type is string => type !== undefined),
-          points: value.points,
-          badgeId: value.badgeId
-        } 
+      dispatch(updateFormData({
+        id: challengeId,
+        formData: {
+          rewards: {
+            types: (value.rewardTypes || []).filter((type): type is string => type !== undefined),
+            points: value.points,
+            badgeId: value.badgeId
+          }
+        }
       }));
     });
     return () => subscription.unsubscribe();
-  }, [form, dispatch]);
+  }, [form, dispatch, challengeId]);
 
   // Handle step advancement based on selected reward types
   useEffect(() => {
@@ -368,7 +375,11 @@ const RewardsStep = ({ subStep, form, onAdvanceSubStep }: RewardsStepProps) => {
 };
 
 export function useRewardsForm() {
-  const { rewards } = useAppSelector((state) => state.challenge.formData);
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
+  const rewards = currentChallenge?.formData.rewards;
   
   return useForm<RewardsFormData>({
     resolver: zodResolver(formSchema),

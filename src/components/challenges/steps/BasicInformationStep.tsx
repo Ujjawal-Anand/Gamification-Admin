@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import * as z from 'zod';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Form,
   FormControl,
@@ -89,14 +90,17 @@ interface BasicInformationStepProps {
 
 export function BasicInformationStep({ subStep }: { subStep: number }) {
   const dispatch = useAppDispatch();
-  const { formData } = useAppSelector((state) => state.challenge);
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      category: formData.basicInformation?.category,
+      category: currentChallenge?.formData.basicInformation?.category,
       theme: '',
-      importance: formData.basicInformation?.importance || '',
+      importance: currentChallenge?.formData.basicInformation?.importance || '',
     },
     mode: 'onChange',
   });
@@ -160,10 +164,13 @@ export function BasicInformationStep({ subStep }: { subStep: number }) {
   useEffect(() => {
     const subscription = form.watch((value) => {
       console.log('Form value changed:', value);
-      dispatch(updateFormData({ basicInformation: value as z.infer<typeof formSchema> }));
+      dispatch(updateFormData({ 
+        id: challengeId,
+        formData: { basicInformation: value as z.infer<typeof formSchema> }
+      }));
     });
     return () => subscription.unsubscribe();
-  }, [form, dispatch]);
+  }, [form, dispatch, challengeId]);
 
   // Custom render for theme question to inject info icon logic
   if (currentQuestion.name === 'theme') {

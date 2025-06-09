@@ -15,6 +15,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { UseFormReturn } from 'react-hook-form';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
+import { useSearchParams } from 'next/navigation';
 
 // Define the base schema that all challenge types will have
 const baseSchema = {
@@ -28,12 +29,14 @@ const baseSchema = {
       steps: z.number(),
       trackingPeriod: z.enum(['Day', 'Total'])
     })
-  ]),
+  ]).optional(),
   measurement: z.string().optional(),
   trackingPeriod: z.string().optional(),
   squaresRequired: z.string().optional(),
   dailyChallenges: z.string().optional(),
   questionsRequired: z.string().optional(),
+  theme: z.string().optional(),
+  objectiveData: z.any().optional(),
 };
 
 // Define the schema based on challenge type
@@ -45,7 +48,7 @@ const getFormSchema = (theme: string) => {
         objective: z.object({
           value: z.number().min(1, 'Please enter a valid distance'),
           unit: z.enum(['kilometers', 'miles'])
-        }),
+        }).optional(),
       });
     case 'Steps':
       return z.object({
@@ -53,12 +56,12 @@ const getFormSchema = (theme: string) => {
         objective: z.object({
           steps: z.number().min(1, 'Please enter a valid number of steps'),
           trackingPeriod: z.enum(['Day', 'Total'])
-        }),
+        }).optional(),
       });
     case 'Team Challenge':
       return z.object({
         ...baseSchema,
-        trackingPeriod: z.enum(['Daily', 'Total']),
+        trackingPeriod: z.enum(['Daily', 'Total']).optional(),
       });
     case 'Bingo':
       return z.object({
@@ -66,7 +69,7 @@ const getFormSchema = (theme: string) => {
         squaresRequired: z.string().refine((val) => {
           const num = parseInt(val);
           return !isNaN(num) && num >= 5 && num <= 20;
-        }, 'Please select a valid number of squares'),
+        }, 'Please select a valid number of squares').optional(),
       });
     case 'Mini Challenge':
       return z.object({
@@ -74,7 +77,7 @@ const getFormSchema = (theme: string) => {
         dailyChallenges: z.string().refine((val) => {
           const num = parseInt(val);
           return num >= 1 && num <= 30;
-        }, 'Must be between 1 and 30'),
+        }, 'Must be between 1 and 30').optional(),
       });
     case 'Nutrition Quiz':
       return z.object({
@@ -82,13 +85,13 @@ const getFormSchema = (theme: string) => {
         questionsRequired: z.string().refine((val) => {
           const num = parseInt(val);
           return num >= 1 && num <= 15;
-        }, 'Must be between 1 and 15'),
+        }, 'Must be between 1 and 15').optional(),
       });
     case 'The Most':
       return z.object({
         ...baseSchema,
-        measurement: z.enum(['miles', 'steps']),
-        trackingPeriod: z.enum(['Daily', 'Total']),
+        measurement: z.enum(['miles', 'steps']).optional(),
+        trackingPeriod: z.enum(['Daily', 'Total']).optional(),
       });
     default:
       return z.object(baseSchema);
@@ -480,15 +483,27 @@ interface StoredObjective {
   squaresRequired?: string;
   dailyChallenges?: string;
   questionsRequired?: string;
-  rawData?: any;
+  rawData?: {
+    objective?: any;
+    measurement?: string;
+    trackingPeriod?: string;
+    squaresRequired?: string;
+    dailyChallenges?: string;
+    questionsRequired?: string;
+    theme?: string;
+    objectiveData?: any;
+  };
 }
 
 export function useObjectiveForm() {
   const dispatch = useAppDispatch();
-  const { formData } = useAppSelector((state) => state.challenge);
-  const category = formData.basicInformation?.category || '';
-  const theme = formData.basicInformation?.theme || '';
-  const storedObjective: StoredObjective = formData?.objective || {};
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
+  const category = currentChallenge?.formData.basicInformation?.category || '';
+  const theme = currentChallenge?.formData.basicInformation?.theme || '';
+  const storedObjective = (currentChallenge?.formData.objective || {}) as StoredObjective;
 
   // Initialize form with stored data
   const defaultValues = useMemo(() => {
@@ -542,111 +557,86 @@ export function useObjectiveForm() {
   const objectiveValue = watch('objective');
   const squaresRequired = watch('squaresRequired');
 
-  // Validation helpers
-  const isBingoValid = theme === 'Bingo' ? Boolean(squaresRequired) : true;
-  const isDistanceValid = theme === 'Distance' ? 
-    Boolean(objectiveValue?.value) && objectiveValue?.value !== 0 && Boolean(objectiveValue?.unit) : true;
-  const isStepsValid = theme === 'Steps' ? 
-    Boolean(objectiveValue?.steps) && Boolean(objectiveValue?.trackingPeriod) : true;
-
   // Handle form changes and dispatch updates
   useEffect(() => {
-    const subscription = watch((data) => {
+    const subscription = watch((data: any) => {
       if (!data) return;
 
       let formattedObjective = '';
       let measurement = '';
-      let objectiveData = {};
       
       switch (theme) {
         case 'Distance':
           if (data.objective?.value && data.objective.value !== 0) {
             formattedObjective = `${data.objective.value} ${data.objective.unit}`;
             measurement = data.objective.unit;
-            objectiveData = {
-              value: data.objective.value,
-              unit: data.objective.unit
-            };
           }
           break;
         case 'Steps':
           if (data.objective?.steps) {
             formattedObjective = `${data.objective.steps} steps`;
             measurement = 'steps';
-            objectiveData = {
-              steps: data.objective.steps,
-              trackingPeriod: data.objective.trackingPeriod
-            };
           }
           break;
         case 'Bingo':
           if (data.squaresRequired) {
             formattedObjective = `${data.squaresRequired} squares`;
             measurement = 'squares';
-            objectiveData = {
-              squaresRequired: data.squaresRequired
-            };
           }
           break;
         case 'Mini Challenge':
           if (data.dailyChallenges) {
             formattedObjective = `${data.dailyChallenges} challenges`;
             measurement = 'challenges';
-            objectiveData = {
-              dailyChallenges: data.dailyChallenges
-            };
           }
           break;
         case 'Nutrition Quiz':
           if (data.questionsRequired) {
             formattedObjective = `${data.questionsRequired} questions`;
             measurement = 'questions';
-            objectiveData = {
-              questionsRequired: data.questionsRequired
-            };
           }
           break;
         default:
           if (data.objective) {
             formattedObjective = data.objective;
             measurement = data.measurement || '';
-            objectiveData = {
-              objective: data.objective
-            };
           }
       }
 
       if (formattedObjective) {
-        const finalObjectiveData = {
-          objective: {
-            objective: formattedObjective,
-            measurement: measurement,
-            trackingPeriod: data.trackingPeriod || '',
-            squaresRequired: data.squaresRequired || '',
-            dailyChallenges: data.dailyChallenges || '',
-            questionsRequired: data.questionsRequired || '',
-            rawData: {
-              ...data,
-              theme: theme,
-              objectiveData: objectiveData
-            }
-          }
+        const objectiveData = {
+          objective: formattedObjective,
+          successCriteria: '',
+          primaryGoal: '',
+          measurement: measurement,
+          trackingPeriod: data.trackingPeriod || '',
+          squaresRequired: data.squaresRequired || '',
+          dailyChallenges: data.dailyChallenges || '',
+          questionsRequired: data.questionsRequired || ''
         };
-        
-        dispatch(updateFormData(finalObjectiveData));
+
+        dispatch(updateFormData({
+          id: challengeId,
+          formData: {
+            objective: objectiveData
+          }
+        }));
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [watch, theme, dispatch]);
+  }, [watch, theme, dispatch, challengeId]);
 
   return form;
 }
 
 export function ObjectiveStep({ subStep, form }: ObjectiveStepProps) {
-  const { formData } = useAppSelector((state) => state.challenge);
-  const category = formData.basicInformation?.category || '';
-  const theme = formData.basicInformation?.theme || '';
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
+  const category = currentChallenge?.formData.basicInformation?.category || '';
+  const theme = currentChallenge?.formData.basicInformation?.theme || '';
 
   const questions = getObjectiveQuestions(category, theme);
 

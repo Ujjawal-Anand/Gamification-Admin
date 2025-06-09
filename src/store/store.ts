@@ -1,14 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
-import challengeReducer, { ChallengeFormData } from './challengeSlice';
+import challengeReducer, { Challenge } from './challengeSlice';
 
 export interface RootState {
   challenge: {
-    formData: Partial<ChallengeFormData>;
-    currentStep: number;
-    currentSubStep: number;
+    challenges: Challenge[];
     isSubmitting: boolean;
     error: string | null;
-    id: string | undefined;
   };
 }
 

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
 
 type DetailsField = {
   name: string;
@@ -155,20 +156,23 @@ const stockImages = {
 };
 
 export function useDetailsForm() {
-  const { formData } = useAppSelector((state) => state.challenge);
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
   
   return useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: formData.details?.name || '',
-      headline: formData.details?.headline || '',
-      summary: formData.details?.summary || '',
-      image: formData.details?.image || '',
-      heroImage: formData.details?.heroImage || '',
-      enrollmentStartDate: formData.details?.enrollmentStartDate || '',
-      enrollmentEndDate: formData.details?.enrollmentEndDate || '',
-      challengeStartDate: formData.details?.challengeStartDate || '',
-      challengeEndDate: formData.details?.challengeEndDate || '',
+      name: currentChallenge?.formData.details?.name || '',
+      headline: currentChallenge?.formData.details?.headline || '',
+      summary: currentChallenge?.formData.details?.summary || '',
+      image: currentChallenge?.formData.details?.image || '',
+      heroImage: currentChallenge?.formData.details?.heroImage || '',
+      enrollmentStartDate: currentChallenge?.formData.details?.enrollmentStartDate || '',
+      enrollmentEndDate: currentChallenge?.formData.details?.enrollmentEndDate || '',
+      challengeStartDate: currentChallenge?.formData.details?.challengeStartDate || '',
+      challengeEndDate: currentChallenge?.formData.details?.challengeEndDate || '',
     },
     mode: 'onChange',
   });
@@ -178,9 +182,11 @@ export const DETAILS_TOTAL = questions.length;
 
 export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnType<typeof useDetailsForm> }) {
   const dispatch = useAppDispatch();
-  const { formData } = useAppSelector((state) => state.challenge);
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
   const [calendarField, setCalendarField] = useState<string | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -189,21 +195,24 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
   useEffect(() => {
     const subscription = form.watch((value) => {
       dispatch(updateFormData({
-        details: {
-          name: value.name || '',
-          headline: value.headline || '',
-          summary: value.summary || '',
-          image: value.image || '',
-          heroImage: value.heroImage || '',
-          enrollmentStartDate: value.enrollmentStartDate || '',
-          enrollmentEndDate: value.enrollmentEndDate || '',
-          challengeStartDate: value.challengeStartDate || '',
-          challengeEndDate: value.challengeEndDate || '',
+        id: challengeId,
+        formData: {
+          details: {
+            name: value.name || '',
+            headline: value.headline || '',
+            summary: value.summary || '',
+            image: value.image || '',
+            heroImage: value.heroImage || '',
+            enrollmentStartDate: value.enrollmentStartDate || '',
+            enrollmentEndDate: value.enrollmentEndDate || '',
+            challengeStartDate: value.challengeStartDate || '',
+            challengeEndDate: value.challengeEndDate || '',
+          }
         }
       }));
     });
     return () => subscription.unsubscribe();
-  }, [form, dispatch]);
+  }, [form, dispatch, challengeId]);
 
   useEffect(() => {
     const el = document.querySelector('input,select,button[aria-pressed]');
@@ -509,7 +518,7 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
                       )}
                       onClick={() => {
                         setCalendarField(field.name);
-                        setCalendarOpen(true);
+                        setIsCalendarOpen(true);
                       }}
                     >
                       {formatDate(f.value) || `MM/DD/YYYY`}
@@ -523,8 +532,8 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
           </div>
         </div>
         <BottomSheetInfo
-          open={calendarOpen}
-          onOpenChange={(open) => setCalendarOpen(open)}
+          open={isCalendarOpen}
+          onOpenChange={(open) => setIsCalendarOpen(open)}
           title={calendarField ? questions.find(q => q.fields?.some(f => f.name === calendarField))?.fields?.find(f => f.name === calendarField)?.label || '' : ''}
         >
           <Calendar
@@ -543,7 +552,7 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
                 const dd = String(date.getDate()).padStart(2, '0');
                 form.setValue(calendarField as any, `${yyyy}-${mm}-${dd}`);
                 form.trigger(calendarField as any); // Trigger validation after setting value
-                setCalendarOpen(false);
+                setIsCalendarOpen(false);
               }
             }}
             initialFocus

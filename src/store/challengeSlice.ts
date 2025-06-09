@@ -1,161 +1,128 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import * as z from 'zod';
+import { ChallengeFormData } from '@/types/challenge';
 
-// Define the type for our form data
-export interface ChallengeFormData {
-  basicInformation: {
-    category: 'Nutrition' | 'Mindfulness' | 'Sleep' | 'Activity';
-    theme: string;
-    importance: string;
-  };
-  details: {
-    name: string;
-    headline: string;
-    summary: string;
-    image: string;
-    heroImage: string;
-    enrollmentStartDate: string;
-    enrollmentEndDate: string;
-    challengeStartDate: string;
-    challengeEndDate: string;
-  };
-  eligibility: {
-    ageRange: {
-      min: number;
-      max: number;
-    };
-    gender: string;
-    location: string;
-    healthConditions: string[];
-    otherRequirements: string;
-  };
-  features: {
-    nextBestActions: string[];
-    nutritionWidget?: string;
-    recipeDiet?: string;
-  };
-  objective: {
-    objective: string;
-    successCriteria: string;
-    primaryGoal: string;
-    measurement: string;
-    trackingPeriod: string;
-    squaresRequired: string;
-    dailyChallenges: string;
-    questionsRequired: string;
-  };
-  rewards: {
-    types: string[];
-    points?: number;
-    badgeId?: string;
-  };
+export interface Challenge {
+  id: string;
+  status: 'draft' | 'submitted' | 'listed';
+  formData: Partial<ChallengeFormData>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ChallengeState {
-  id: string;
-  currentStep: number;
-  currentSubStep: number;
-  formData: {
-    basicInformation?: {
-      category?: string;
-      theme?: string;
-      importance?: string;
-    };
-    objective?: {
-      objective?: string;
-      measurement?: string;
-      trackingPeriod?: string;
-      squaresRequired?: string;
-      dailyChallenges?: string;
-      questionsRequired?: string;
-      rawData?: any;
-    };
-    details?: any;
-    rewards?: any;
-    features?: any;
-  };
+  challenges: Challenge[];
+  isSubmitting: boolean;
+  error: string | null;
 }
 
 const initialState: ChallengeState = {
-  id: '',
-  currentStep: 0,
-  currentSubStep: 0,
-  formData: {
-    basicInformation: {},
-    objective: {},
-    details: {},
-    rewards: {},
-    features: {},
-  },
+  challenges: [],
+  isSubmitting: false,
+  error: null,
 };
 
 const challengeSlice = createSlice({
   name: 'challenge',
   initialState,
   reducers: {
-    setChallengeId: (state, action: PayloadAction<string>) => {
-      state.id = action.payload;
+    initChallenge: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      const exists = state.challenges.some(c => c.id === id);
+      if (!exists) {
+        const newChallenge: Challenge = {
+          id,
+          status: 'draft',
+          formData: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        state.challenges.push(newChallenge);
+      }
     },
-    setCurrentStep: (state, action: PayloadAction<number>) => {
-      state.currentStep = action.payload;
+    addChallenge: (state, action: PayloadAction<Challenge>) => {
+      state.challenges.push(action.payload);
     },
-    setCurrentSubStep: (state, action: PayloadAction<number>) => {
-      state.currentSubStep = action.payload;
+    updateChallenge: (state, action: PayloadAction<{ id: string; updates: Partial<Challenge> }>) => {
+      const index = state.challenges.findIndex(c => c.id === action.payload.id);
+      if (index !== -1) {
+        state.challenges[index] = {
+          ...state.challenges[index],
+          ...action.payload.updates,
+          updatedAt: new Date().toISOString(),
+        };
+      }
     },
-    updateFormData: (state, action: PayloadAction<any>) => {
+    updateFormData: (state, action: PayloadAction<{ id: string; formData: Partial<ChallengeFormData> }>) => {
       console.log('Redux: Updating form data with:', action.payload);
       
-      // Handle objective data specifically
-      if (action.payload.objective) {
-        console.log('Redux: Processing objective data:', action.payload.objective);
-        state.formData.objective = {
-          ...state.formData.objective,
-          ...action.payload.objective,
-          // Ensure all fields are strings
-          objective: String(action.payload.objective.objective || ''),
-          measurement: String(action.payload.objective.measurement || ''),
-          trackingPeriod: String(action.payload.objective.trackingPeriod || ''),
-          squaresRequired: String(action.payload.objective.squaresRequired || ''),
-          dailyChallenges: String(action.payload.objective.dailyChallenges || ''),
-          questionsRequired: String(action.payload.objective.questionsRequired || ''),
-          rawData: action.payload.objective.rawData || {}
+      const index = state.challenges.findIndex(c => c.id === action.payload.id);
+      if (index !== -1) {
+        // Update existing challenge
+        state.challenges[index] = {
+          ...state.challenges[index],
+          formData: {
+            ...state.challenges[index].formData,
+            ...action.payload.formData,
+          },
+          updatedAt: new Date().toISOString(),
         };
-        console.log('Redux: Updated objective state:', state.formData.objective);
+      } else {
+        // Create new challenge
+        const newChallenge: Challenge = {
+          id: action.payload.id,
+          status: 'draft',
+          formData: action.payload.formData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        state.challenges.push(newChallenge);
       }
 
-      // Update other form data
-      Object.keys(action.payload).forEach(key => {
-        if (key !== 'objective') {
-          state.formData[key as keyof typeof state.formData] = {
-            ...state.formData[key as keyof typeof state.formData],
-            ...action.payload[key]
-          };
-        }
-      });
-
-      console.log('Redux: Final form data state:', state.formData);
+      console.log('Redux: Updated challenges state:', state.challenges);
     },
-    resetChallenge: (state) => {
-      state.id = '';
-      state.currentStep = 0;
-      state.currentSubStep = 0;
-      state.formData = {
-        basicInformation: {},
-        objective: {},
-        details: {},
-        rewards: {},
-        features: {},
-      };
+    updateChallengeId: (state, action: PayloadAction<{ oldId: string; newId: string }>) => {
+      const index = state.challenges.findIndex(c => c.id === action.payload.oldId);
+      if (index !== -1) {
+        state.challenges[index] = {
+          ...state.challenges[index],
+          id: action.payload.newId,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    },
+    updateChallengeStatus: (state, action: PayloadAction<{ id: string; status: Challenge['status'] }>) => {
+      const index = state.challenges.findIndex(c => c.id === action.payload.id);
+      if (index !== -1) {
+        state.challenges[index] = {
+          ...state.challenges[index],
+          status: action.payload.status,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    },
+    deleteChallenge: (state, action: PayloadAction<string>) => {
+      state.challenges = state.challenges.filter(c => c.id !== action.payload);
+    },
+    setSubmitting: (state, action: PayloadAction<boolean>) => {
+      state.isSubmitting = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
     },
   },
 });
 
 export const { 
-  setChallengeId,
-  setCurrentStep, 
-  setCurrentSubStep, 
-  updateFormData, 
-  resetChallenge 
+  initChallenge,
+  addChallenge,
+  updateChallenge,
+  updateFormData,
+  updateChallengeId,
+  updateChallengeStatus,
+  deleteChallenge,
+  setSubmitting,
+  setError,
 } = challengeSlice.actions;
 
 export default challengeSlice.reducer; 

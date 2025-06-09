@@ -13,7 +13,7 @@ import { FeaturesStep, useFeaturesForm, getFeaturesTotalSteps } from './steps/Fe
 import { ReviewStep } from './steps/ReviewStep';
 import { StepIntroduction } from './steps/StepIntroduction';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setCurrentStep, setCurrentSubStep, setChallengeId, updateFormData } from '@/store/challengeSlice';
+import { updateFormData } from '@/store/challengeSlice';
 import { 
   Info, 
   Target, 
@@ -32,6 +32,9 @@ import {
 import { UseFormReturn } from 'react-hook-form';
 import { persistor } from '@/store';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Challenge } from '@/store/challengeSlice';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { BottomSheetInfo } from './BottomSheetInfo';
 
 // Add RewardsFormData interface
 interface RewardsFormData {
@@ -160,8 +163,13 @@ export function ChallengeCreationWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
-  const { id, currentStep, currentSubStep, formData } = useAppSelector((state) => state.challenge);
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
   const [showIntroduction, setShowIntroduction] = useState(true);
+  
+  // Step management
+  const [currentStep, setCurrentStep] = useState(0);
   
   // For Basic Information step, manage subStep
   const [basicInfoSubStep, setBasicInfoSubStep] = useState(0);
@@ -196,12 +204,12 @@ export function ChallengeCreationWizard() {
   const isEligibilityStep = steps[currentStep].id === 'eligibility';
   const isFeaturesStep = steps[currentStep].id === 'features';
 
-  const category = formData.basicInformation?.category || '';
-  const theme = formData.basicInformation?.theme || '';
+  const category = currentChallenge?.formData?.basicInformation?.category || '';
+  const theme = currentChallenge?.formData?.basicInformation?.theme || '';
   const objectiveTotal = getObjectiveTotal(category, theme);
 
   // Calculate features total based on selected actions
-  const featuresTotal = getFeaturesTotalSteps(formData.features?.nextBestActions || []);
+  const featuresTotal = getFeaturesTotalSteps(currentChallenge?.formData?.features?.nextBestActions || []);
 
   // Substep field arrays
   const basicInfoQuestions: ('category' | 'theme' | 'importance')[] = ['category', 'theme', 'importance'];
@@ -237,7 +245,7 @@ export function ChallengeCreationWizard() {
   }, [FEATURES_TOTAL_DYNAMIC, isFeaturesStep]);
 
   // isFirst and isLast logic
-  const isFirst = currentStep === 0 && currentSubStep === 0;
+  const isFirst = currentStep === 0 && basicInfoSubStep === 0;
 
   const isLast =
     (isBasicInfoStep && basicInfoSubStep === BASIC_INFO_TOTAL - 1 && currentStep === steps.length - 1) ||
@@ -250,36 +258,18 @@ export function ChallengeCreationWizard() {
   // isValid logic
   const [isValid, setIsValid] = useState(true);
 
-  // Generate or get challenge ID
-  useEffect(() => {
-    const challengeId = searchParams.get('id');
-    if (challengeId) {
-      dispatch(setChallengeId(challengeId));
-    } else {
-      // Generate new ID if none exists
-      const newId = crypto.randomUUID();
-      dispatch(setChallengeId(newId));
-      // Update URL with new ID
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('id', newId);
-      router.push(`?${params.toString()}`, { scroll: false });
-    }
-  }, [searchParams, dispatch, router]);
-
   // Sync URL with current step and substep
   useEffect(() => {
     const step = searchParams.get('step');
     const substep = searchParams.get('substep');
-    
+
     if (step && !isNaN(Number(step))) {
       const stepNum = Number(step);
-      dispatch(setCurrentStep(stepNum));
+      setCurrentStep(stepNum);
       
       // Set the appropriate substep based on the current step
       if (substep && !isNaN(Number(substep))) {
         const substepNum = Number(substep);
-        dispatch(setCurrentSubStep(substepNum));
-        
         if (stepNum === 0) {
           setBasicInfoSubStep(substepNum);
         } else if (stepNum === 1) {
@@ -293,95 +283,43 @@ export function ChallengeCreationWizard() {
         }
       }
     }
-  }, [searchParams, dispatch]);
+  }, [searchParams]);
 
-  // Handle back step
-  function handleBack() {
-    if (showIntroduction) {
-      setShowIntroduction(false);
-      return;
-    }
-
-    // Handle substeps first
-    if (isBasicInfoStep && basicInfoSubStep > 0) {
-      setBasicInfoSubStep((s) => s - 1);
-      return;
-    }
-    if (isDetailsStep && detailsSubStep > 0) {
-      setDetailsSubStep((s) => s - 1);
-      return;
-    }
-    if (isObjectiveStep && objectiveSubStep > 0) {
-      setObjectiveSubStep((s) => s - 1);
-      return;
-    }
-    if (isRewardsStep && rewardsSubStep > 0) {
-      setRewardsSubStep((s) => s - 1);
-      return;
-    }
-    if (isFeaturesStep && featuresSubStep > 0) {
-      setFeaturesSubStep((s) => s - 1);
-      return;
-    }
-
-    // If we're at the first substep, go back to previous main step
-    if (currentStep > 0) {
-      dispatch(setCurrentStep(currentStep - 1));
-      // Set the last substep of the previous step
-      if (currentStep === 1) {
-        setBasicInfoSubStep(BASIC_INFO_TOTAL - 1);
-      } else if (currentStep === 2) {
-        setDetailsSubStep(DETAILS_TOTAL - 1);
-      } else if (currentStep === 3) {
-        setObjectiveSubStep(objectiveTotal - 1);
-      } else if (currentStep === 4) {
-        setRewardsSubStep(REWARDS_TOTAL_DYNAMIC - 1);
-      } else if (currentStep === 5) {
-        setFeaturesSubStep(featuresTotal - 1);
-      }
-    }
-  }
-
-  // Update URL when step or substep changes
+  // Update URL when step changes
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (id) {
-      params.set('id', id);
-    }
+    // Create new URLSearchParams from existing URL to preserve all parameters
+    const params = new URLSearchParams(window.location.search);
+    
+    // Update only the parameters we need
     params.set('step', currentStep.toString());
     
-    // Set the appropriate substep based on the current step
-    let currentSubStepValue = 0;
-    if (isBasicInfoStep) {
-      currentSubStepValue = basicInfoSubStep;
-    } else if (isDetailsStep) {
-      currentSubStepValue = detailsSubStep;
-    } else if (isObjectiveStep) {
-      currentSubStepValue = objectiveSubStep;
-    } else if (isRewardsStep) {
-      currentSubStepValue = rewardsSubStep;
-    } else if (isFeaturesStep) {
-      currentSubStepValue = featuresSubStep;
+    // Set the appropriate substep parameter
+    if (currentStep === 0) {
+      params.set('substep', basicInfoSubStep.toString());
+    } else if (currentStep === 1) {
+      params.set('substep', detailsSubStep.toString());
+    } else if (currentStep === 2) {
+      params.set('substep', objectiveSubStep.toString());
+    } else if (currentStep === 3) {
+      params.set('substep', rewardsSubStep.toString());
+    } else if (currentStep === 4) {
+      params.set('substep', featuresSubStep.toString());
     }
     
-    params.set('substep', currentSubStepValue.toString());
-    router.push(`?${params.toString()}`, { scroll: false });
-  }, [
-    id,
-    currentStep,
-    basicInfoSubStep,
-    detailsSubStep,
-    objectiveSubStep,
-    rewardsSubStep,
-    featuresSubStep,
-    router,
-    searchParams,
-    isBasicInfoStep,
-    isDetailsStep,
-    isObjectiveStep,
-    isRewardsStep,
-    isFeaturesStep
-  ]);
+    // Update URL without affecting browser history
+    window.history.replaceState({}, '', `?${params.toString()}`);
+  }, [currentStep, basicInfoSubStep, detailsSubStep, objectiveSubStep, rewardsSubStep, featuresSubStep]);
+
+  // Reset substeps when changing main step
+  useEffect(() => {
+    if (currentStep > 0) {
+      setBasicInfoSubStep(0);
+      setDetailsSubStep(0);
+      setObjectiveSubStep(0);
+      setRewardsSubStep(0);
+      setFeaturesSubStep(0);
+    }
+  }, [currentStep]);
 
   useEffect(() => {
     if (showIntroduction) {
@@ -393,7 +331,7 @@ export function ChallengeCreationWizard() {
 
     if (isBasicInfoStep) {
       const field = basicInfoQuestions[basicInfoSubStep];
-      const value = formData.basicInformation?.[field];
+      const value = currentChallenge?.formData?.basicInformation?.[field];
       currentIsValid = value !== undefined && value !== null && value !== '';
     } else if (isDetailsStep) {
       const field = detailsQuestions[detailsSubStep];
@@ -447,7 +385,7 @@ export function ChallengeCreationWizard() {
              isObjectiveStep ? objectiveQuestions[objectiveSubStep] :
              isRewardsStep ? rewardsQuestions[rewardsSubStep] :
              isFeaturesStep ? featuresVisibleQuestions[featuresSubStep] : null,
-      value: isBasicInfoStep ? formData.basicInformation?.[basicInfoQuestions[basicInfoSubStep]] :
+      value: isBasicInfoStep ? currentChallenge?.formData?.basicInformation?.[basicInfoQuestions[basicInfoSubStep]] :
              isDetailsStep ? detailsForm.getValues(detailsQuestions[detailsSubStep]) :
              isObjectiveStep ? objectiveForm.getValues(objectiveQuestions[objectiveSubStep]) :
              isRewardsStep ? rewardsForm.getValues(rewardsQuestions[rewardsSubStep]) :
@@ -468,7 +406,7 @@ export function ChallengeCreationWizard() {
     objectiveSubStep,
     rewardsSubStep,
     featuresSubStep,
-    formData.basicInformation,
+    currentChallenge?.formData?.basicInformation,
     detailsForm.formState,
     objectiveForm.formState,
     rewardsForm.formState,
@@ -491,7 +429,7 @@ export function ChallengeCreationWizard() {
         setBasicInfoSubStep((s) => s + 1);
         return;
       }
-      dispatch(setCurrentStep(currentStep + 1));
+      setCurrentStep(currentStep + 1);
       return;
     }
     if (isDetailsStep) {
@@ -499,7 +437,7 @@ export function ChallengeCreationWizard() {
         setDetailsSubStep((s) => s + 1);
         return;
       }
-      dispatch(setCurrentStep(currentStep + 1));
+      setCurrentStep(currentStep + 1);
       return;
     }
     if (isObjectiveStep) {
@@ -507,7 +445,7 @@ export function ChallengeCreationWizard() {
         setObjectiveSubStep((s) => s + 1);
         return;
       }
-      dispatch(setCurrentStep(currentStep + 1));
+      setCurrentStep(currentStep + 1);
       return;
     }
     if (isRewardsStep) {
@@ -523,17 +461,9 @@ export function ChallengeCreationWizard() {
       }
     }
     if (currentStep < steps.length - 1) {
-      dispatch(setCurrentStep(currentStep + 1));
-      dispatch(setCurrentSubStep(0));
+      setCurrentStep(currentStep + 1);
     }
   }
-
-  // Reset substeps when changing main step
-  useEffect(() => {
-    if (currentStep > 0) {
-      dispatch(setCurrentSubStep(0));
-    }
-  }, [currentStep, dispatch]);
 
   // Reset introduction when changing steps
   useEffect(() => {
@@ -550,35 +480,51 @@ export function ChallengeCreationWizard() {
     if (isBasicInfoStep) {
       basicInfoForm.handleSubmit((values) => {
         console.log('Basic Info:', values);
-        dispatch(updateFormData({ basicInformation: values }));
+        dispatch(updateFormData({
+          id: challengeId,
+          formData: { basicInformation: values }
+        }));
         handleNext();
       })();
     } else if (isDetailsStep) {
       detailsForm.handleSubmit((values) => {
         console.log('Details:', values);
-        dispatch(updateFormData({ details: values }));
+        dispatch(updateFormData({
+          id: challengeId,
+          formData: { details: values }
+        }));
         handleNext();
       })();
     } else if (isObjectiveStep) {
-      objectiveForm.handleSubmit((values: any) => {
+      objectiveForm.handleSubmit((values) => {
         console.log('Objective:', values);
         handleNext();
       })();
     } else if (isRewardsStep) {
       rewardsForm.handleSubmit((values) => {
         console.log('Rewards:', values);
-        dispatch(updateFormData({ rewards: values }));
+        dispatch(updateFormData({
+          id: challengeId,
+          formData: { 
+            rewards: {
+              types: values.rewardTypes || [],
+              points: values.points,
+              badgeId: values.badgeId
+            }
+          }
+        }));
         handleNext();
       })();
     } else if (isFeaturesStep) {
       featuresForm.handleSubmit((values) => {
         console.log('Features:', values);
-        dispatch(updateFormData({ features: values }));
+        dispatch(updateFormData({
+          id: challengeId,
+          formData: { features: values }
+        }));
         handleNext();
       })();
     } else {
-      // Clear persisted state when wizard is completed
-      persistor.purge();
       handleNext();
     }
   };
@@ -588,6 +534,53 @@ export function ChallengeCreationWizard() {
     // State is automatically persisted by redux-persist
     // You can add navigation logic here to redirect to another page
   };
+
+  // Handle back step
+  function handleBack() {
+    if (showIntroduction) {
+      setShowIntroduction(false);
+      return;
+    }
+
+    // Handle substeps first
+    if (isBasicInfoStep && basicInfoSubStep > 0) {
+      setBasicInfoSubStep((s) => s - 1);
+      return;
+    }
+    if (isDetailsStep && detailsSubStep > 0) {
+      setDetailsSubStep((s) => s - 1);
+      return;
+    }
+    if (isObjectiveStep && objectiveSubStep > 0) {
+      setObjectiveSubStep((s) => s - 1);
+      return;
+    }
+    if (isRewardsStep && rewardsSubStep > 0) {
+      setRewardsSubStep((s) => s - 1);
+      return;
+    }
+    if (isFeaturesStep && featuresSubStep > 0) {
+      setFeaturesSubStep((s) => s - 1);
+      return;
+    }
+
+    // If we're at the first substep, go back to previous main step
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+      // Set the last substep of the previous step
+      if (currentStep === 1) {
+        setBasicInfoSubStep(BASIC_INFO_TOTAL - 1);
+      } else if (currentStep === 2) {
+        setDetailsSubStep(DETAILS_TOTAL - 1);
+      } else if (currentStep === 3) {
+        setObjectiveSubStep(objectiveTotal - 1);
+      } else if (currentStep === 4) {
+        setRewardsSubStep(REWARDS_TOTAL_DYNAMIC - 1);
+      } else if (currentStep === 5) {
+        setFeaturesSubStep(featuresTotal - 1);
+      }
+    }
+  }
 
   // Render current step content
   let stepContent = null;
@@ -682,13 +675,59 @@ export function ChallengeCreationWizard() {
     isCompleted: currentStep > index
   }));
 
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [showFAQ, setShowFAQ] = useState(false);
+
   return (
     <div className="relative min-h-screen bg-background flex flex-col">
       {/* Sticky Top Bar */}
       <div className="sticky top-0 z-30 bg-white flex justify-between items-center px-6 py-4">
-        <Button variant="outline" className="rounded-full px-6">Save & exit</Button>
-        <Button variant="outline" className="rounded-full px-6">Questions?</Button>
+        <Button variant="outline" className="rounded-full px-6" onClick={() => setShowExitModal(true)}>Save & exit</Button>
+        <Button variant="outline" className="rounded-full px-6" onClick={() => setShowFAQ(true)}>Questions?</Button>
       </div>
+
+      {/* Save & Exit Confirmation Modal */}
+      <Dialog open={showExitModal} onOpenChange={setShowExitModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Exit</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to save and exit? You can continue editing this challenge later from your dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-4 mt-6">
+            <Button variant="outline" onClick={() => setShowExitModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => { setShowExitModal(false); router.push('/'); }}>
+              Confirm
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* FAQ Bottom Sheet */}
+      <BottomSheetInfo
+        open={showFAQ}
+        onOpenChange={setShowFAQ}
+        title="Frequently Asked Questions"
+        subtitle="Find answers to common questions about creating a challenge."
+      >
+        <div className="space-y-4">
+          <div>
+            <div className="font-semibold">How do I save my progress?</div>
+            <div className="text-sm text-muted-foreground">Your progress is saved automatically as you fill out the form. You can also use the 'Save & exit' button at any time.</div>
+          </div>
+          <div>
+            <div className="font-semibold">Can I edit my challenge later?</div>
+            <div className="text-sm text-muted-foreground">Yes, you can return to your dashboard and edit any challenge that is in draft or submitted status.</div>
+          </div>
+          <div>
+            <div className="font-semibold">What happens after I submit for review?</div>
+            <div className="text-sm text-muted-foreground">Your challenge will be reviewed by an admin. You will be notified once it is approved or if changes are needed.</div>
+          </div>
+        </div>
+      </BottomSheetInfo>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center px-6 pt-10 pb-8 w-full">

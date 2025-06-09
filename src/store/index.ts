@@ -26,7 +26,7 @@ const storage = typeof window !== 'undefined'
 const persistConfig = {
   key: 'challenge-wizard',
   storage,
-  whitelist: ['currentStep', 'currentSubStep', 'formData'], // explicitly specify what to persist
+  whitelist: ['challenges', 'currentChallenge'], // persist challenges collection and current challenge
 };
 
 const persistedReducer = persistReducer(persistConfig, challengeReducer);

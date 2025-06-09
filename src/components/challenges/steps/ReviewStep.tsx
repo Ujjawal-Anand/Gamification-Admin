@@ -1,7 +1,17 @@
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2 } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
+import { updateChallengeStatus } from '@/store/challengeSlice';
+
+const ReactConfetti = dynamic(() => import('react-confetti'), {
+  ssr: false
+});
 
 interface ObjectiveData {
   steps?: number;
@@ -58,7 +68,53 @@ interface SectionConfig {
 }
 
 export function ReviewStep() {
-  const { formData } = useAppSelector((state) => state.challenge);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
+  const formData = currentChallenge?.formData || {};
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState<'submit' | 'draft'>('submit');
+  const [windowSize, setWindowSize] = useState({
+    width: 0,
+    height: 0,
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    // Set initial size
+    handleResize();
+
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleSubmit = (type: 'submit' | 'draft') => {
+    setModalType(type);
+    setShowModal(true);
+    
+    // Update challenge status in Redux store
+    if (type === 'submit') {
+      dispatch(updateChallengeStatus({ id: challengeId, status: 'submitted' }));
+    } else {
+      dispatch(updateChallengeStatus({ id: challengeId, status: 'draft' }));
+    }
+  };
+
+  const handleGoToDashboard = () => {
+    router.push('/');
+  };
 
   const sections: SectionConfig[] = [
     {
@@ -196,7 +252,6 @@ export function ReviewStep() {
             <h3 className="text-xl font-semibold mb-4">{section.title}</h3>
             <div className="space-y-4">
               {section.fields.map((field) => {
-                // Skip field if it has a showIf condition that evaluates to false
                 if (field.showIf && !field.showIf(section.data)) return null;
                 
                 const value = getValue(section.data, field.key);
@@ -219,12 +274,52 @@ export function ReviewStep() {
         ))}
       </div>
 
-     
-
       <div className="flex justify-end gap-4 mt-8">
-        <Button variant="outline">Save as Draft</Button>
-        <Button>Publish Challenge</Button>
+        <Button variant="outline" onClick={() => handleSubmit('draft')}>Save as Draft</Button>
+        <Button onClick={() => handleSubmit('submit')}>Submit for Review</Button>
       </div>
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-md">
+          {showModal && (
+            <ReactConfetti
+              width={windowSize.width}
+              height={windowSize.height}
+              recycle={false}
+              numberOfPieces={200}
+              gravity={0.2}
+            />
+          )}
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-bold">
+              {modalType === 'submit' ? 'Challenge Submitted!' : 'Draft Saved!'}
+            </DialogTitle>
+            <DialogDescription className="text-center text-lg mt-4">
+              {modalType === 'submit' 
+                ? 'Your challenge has been submitted for review.'
+                : 'Your challenge has been saved as a draft.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center mt-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.5, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Button 
+                  size="lg" 
+                  onClick={handleGoToDashboard}
+                  className="px-8"
+                >
+                  Go to Dashboard
+                </Button>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

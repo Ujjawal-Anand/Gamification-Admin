@@ -9,18 +9,15 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateFormData } from '@/store/challengeSlice';
 import { cn } from '@/lib/utils';
 import { CheckCircle2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 const formSchema = z.object({
-  nextBestActions: z.array(z.string()).min(1, 'Select at least one next best action'),
+  nextBestActions: z.array(z.string()),
   nutritionWidget: z.string().optional(),
   recipeDiet: z.string().optional(),
 });
 
-interface FeaturesFormData {
-  nextBestActions: string[];
-  nutritionWidget?: string;
-  recipeDiet?: string;
-}
+type FeaturesFormData = z.infer<typeof formSchema>;
 
 const nutritionWidgetOptions = [
   {
@@ -333,14 +330,17 @@ const questions = [
 ];
 
 export function useFeaturesForm() {
-  const { formData } = useAppSelector((state) => state.challenge);
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
+  const challenges = useAppSelector((state) => state.challenge.challenges);
+  const currentChallenge = challenges.find(c => c.id === challengeId);
   
   return useForm<FeaturesFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nextBestActions: formData.features?.nextBestActions || [],
-      nutritionWidget: formData.features?.nutritionWidget || '',
-      recipeDiet: formData.features?.recipeDiet || '',
+      nextBestActions: currentChallenge?.formData.features?.nextBestActions || [],
+      nutritionWidget: currentChallenge?.formData.features?.nutritionWidget || '',
+      recipeDiet: currentChallenge?.formData.features?.recipeDiet || '',
     },
     mode: 'onChange',
   });
@@ -355,6 +355,8 @@ interface FeaturesStepProps {
 
 export function FeaturesStep({ subStep, form, onAdvanceSubStep, totalSteps }: FeaturesStepProps) {
   const dispatch = useAppDispatch();
+  const searchParams = useSearchParams();
+  const challengeId = searchParams.get('id') || 'new';
   const selectedActions = form.watch('nextBestActions') || [];
 
   // Get the current question based on subStep and selected actions
@@ -418,15 +420,18 @@ export function FeaturesStep({ subStep, form, onAdvanceSubStep, totalSteps }: Fe
   useEffect(() => {
     const subscription = form.watch((value) => {
       dispatch(updateFormData({
-        features: {
-          nextBestActions: (value.nextBestActions || []).filter((item): item is string => item !== undefined),
-          nutritionWidget: value.nutritionWidget,
-          recipeDiet: value.recipeDiet,
+        id: challengeId,
+        formData: {
+          features: {
+            nextBestActions: (value.nextBestActions || []).filter((item): item is string => item !== undefined),
+            nutritionWidget: value.nutritionWidget,
+            recipeDiet: value.recipeDiet,
+          }
         }
       }));
     });
     return () => subscription.unsubscribe();
-  }, [form, dispatch]);
+  }, [form, dispatch, challengeId]);
 
   return (
     <Form {...form}>
