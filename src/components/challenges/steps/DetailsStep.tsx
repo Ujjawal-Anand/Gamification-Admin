@@ -33,8 +33,8 @@ const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   headline: z.string().min(1, 'Headline is required'),
   summary: z.string().min(1, 'Summary is required'),
-  image: z.string().optional(),
-  heroImage: z.string().optional(),
+  image: z.string().min(1, 'Challenge image is required'),
+  heroImage: z.string().min(1, 'Hero image is required'),
   enrollmentStartDate: z.string().min(1, 'Enrollment start date is required'),
   enrollmentEndDate: z.string().min(1, 'Enrollment end date is required'),
   challengeStartDate: z.string().min(1, 'Challenge start date is required'),
@@ -105,6 +105,54 @@ const questions: DetailsQuestion[] = [
     ],
   },
 ];
+
+// Add stock images data
+const stockImages = {
+  challenge: [
+    {
+      id: 'challenge1',
+      url: '/images/stock/challenge_1.png',
+      label: 'Fitness Challenge'
+    },
+    {
+      id: 'challenge2',
+      url: '/images/stock/challenge_2.png',
+      label: 'Wellness Journey'
+    },
+    {
+      id: 'challenge3',
+      url: '/images/stock/challenge_3.png',
+      label: 'Health Goals'
+    },
+    {
+      id: 'challenge4',
+      url: '/images/stock/challenge_4.png',
+      label: 'Active Lifestyle'
+    }
+  ],
+  hero: [
+    {
+      id: 'hero1',
+      url: '/images/stock/hero1.png',
+      label: 'Hero Banner 1'
+    },
+    {
+      id: 'hero2',
+      url: '/images/stock/hero2.png',
+      label: 'Hero Banner 2'
+    },
+    {
+      id: 'hero3',
+      url: '/images/stock/hero3.png',
+      label: 'Hero Banner 3'
+    },
+    {
+      id: 'hero4',
+      url: '/images/stock/hero4.png',
+      label: 'Hero Banner 4'
+    }
+  ]
+};
 
 export function useDetailsForm() {
   const { formData } = useAppSelector((state) => state.challenge);
@@ -278,6 +326,9 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
               );
             }
             if (field.name === 'image' || field.name === 'heroImage') {
+              const isHero = field.name === 'heroImage';
+              const stockImagesList = isHero ? stockImages.hero : stockImages.challenge;
+              
               return (
                 <FormField
                   key={field.name}
@@ -289,8 +340,13 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
                       {field.subtitle && (
                         <p className="text-muted-foreground mb-4">{field.subtitle}</p>
                       )}
+                      
+                      {/* Preview Section */}
                       <div
-                        className="border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                        className={cn(
+                          "border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors",
+                          fieldState.error && "border-destructive"
+                        )}
                         onClick={() => handleBrowse(field.name as 'image' | 'heroImage')}
                       >
                         {f.value ? (
@@ -302,19 +358,7 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
                         ) : (
                           <div className="space-y-4">
                             <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                              <svg
-                                className="w-6 h-6 text-primary"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                />
-                              </svg>
+                              <UploadCloud className="w-6 h-6 text-primary" />
                             </div>
                             <div>
                               <p className="text-lg font-medium">Click to upload</p>
@@ -337,35 +381,93 @@ export function DetailsStep({ subStep, form }: { subStep: number; form: ReturnTy
         <BottomSheetInfo
           open={showBottomSheet}
           onOpenChange={setShowBottomSheet}
-          title="Upload Image"
+          title={currentImageField === 'image' ? 'Choose Challenge Image' : 'Choose Hero Image'}
+          subtitle="Select from stock images or upload your own"
         >
-          <div className="space-y-4">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-              id="file-upload"
-            />
-            <Button
-              onClick={() => document.getElementById('file-upload')?.click()}
-              className="w-full"
-            >
-              Browse Files
-            </Button>
-            {selectedFile && (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Uploading {selectedFile.name}...
-                </p>
-                <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+          <div className="w-full space-y-6">
+            {/* Stock Images Grid */}
+            <div>
+              <p className="text-sm font-medium mb-3">Stock Images</p>
+              <div className="grid grid-cols-2 gap-4">
+                {stockImages[currentImageField === 'image' ? 'challenge' : 'hero'].map((img) => (
                   <div
-                    className="bg-primary h-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
+                    key={img.id}
+                    className={cn(
+                      "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
+                      form.watch(currentImageField as any) === img.url ? "border-primary" : "border-transparent hover:border-primary/50"
+                    )}
+                    onClick={() => {
+                      form.setValue(currentImageField as any, img.url);
+                      form.trigger(currentImageField as any);
+                      setShowBottomSheet(false);
+                    }}
+                  >
+                    <img
+                      src={img.url}
+                      alt={img.label}
+                      className="w-full h-full object-cover"
+                    />
+                    {form.watch(currentImageField as any) === img.url && (
+                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                        <svg
+                          className="w-8 h-8 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center">
+                <span className="px-4 bg-white text-sm text-gray-500">or</span>
+              </div>
+            </div>
+
+            {/* Upload Section */}
+            <div className="space-y-4">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+                id="file-upload"
+              />
+              <Button
+                onClick={() => document.getElementById('file-upload')?.click()}
+                className="w-full"
+              >
+                Upload Your Own Image
+              </Button>
+              {selectedFile && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Uploading {selectedFile.name}...
+                  </p>
+                  <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-primary h-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </BottomSheetInfo>
       </Form>

@@ -188,10 +188,10 @@ const questions = [
               field.onChange(isNaN(value) ? 0 : value);
             }}
             className={cn(
-              'w-32 text-5xl text-center py-4 focus:outline-none transition-all bg-transparent font-bold border-none',
+              'w-32 text-3xl text-center py-4 focus:outline-none transition-all bg-transparent font-bold border-none',
               fieldState?.error ? 'text-destructive' : 'text-foreground'
             )}
-            placeholder="Enter points"
+            placeholder="Enter"
           />
           <span className="text-3xl font-bold">Points</span>
         </div>
@@ -227,6 +227,9 @@ const RewardsStep = ({ subStep, form, onAdvanceSubStep }: RewardsStepProps) => {
   const currentQuestion = questions[validSubStep];
   const currentValue = form.watch(currentQuestion.name as keyof RewardsFormData);
 
+  // Memoize the current question name to prevent unnecessary effect triggers
+  const currentQuestionName = React.useMemo(() => currentQuestion.name, [currentQuestion.name]);
+
   useEffect(() => {
     const subscription = form.watch((value) => {
       dispatch(updateFormData({ 
@@ -242,16 +245,20 @@ const RewardsStep = ({ subStep, form, onAdvanceSubStep }: RewardsStepProps) => {
 
   // Handle step advancement based on selected reward types
   useEffect(() => {
-    if (currentQuestion.name === 'points' && !selectedRewardTypes.includes('points')) {
-      onAdvanceSubStep();
-    } else if (currentQuestion.name === 'badgeId' && !selectedRewardTypes.includes('badge')) {
-      onAdvanceSubStep();
-    }
-  }, [currentQuestion.name, selectedRewardTypes, onAdvanceSubStep]);
+    // Only proceed if we're not already at the last question
+    if (subStep < questions.length) {
+      const shouldAdvance = 
+        (currentQuestionName === 'points' && !selectedRewardTypes.includes('points')) ||
+        (currentQuestionName === 'badgeId' && !selectedRewardTypes.includes('badge'));
 
-  // If we're beyond the last question, advance to the next step
+      if (shouldAdvance) {
+        onAdvanceSubStep();
+      }
+    }
+  }, [currentQuestionName, selectedRewardTypes, subStep, onAdvanceSubStep]);
+
+  // If we're beyond the last question, return null
   if (subStep >= questions.length) {
-    onAdvanceSubStep();
     return null;
   }
 

@@ -10,6 +10,7 @@ import { updateFormData } from '@/store/challengeSlice';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 // Define the base schema that all challenge types will have
 const baseSchema = {
@@ -18,6 +19,10 @@ const baseSchema = {
     z.object({
       value: z.number(),
       unit: z.enum(['kilometers', 'miles', 'steps'])
+    }),
+    z.object({
+      steps: z.number(),
+      trackingPeriod: z.enum(['Day', 'Total'])
     })
   ]),
   measurement: z.string().optional(),
@@ -41,7 +46,10 @@ const getFormSchema = (category: string, theme: string) => {
     case 'Steps':
       return z.object({
         ...baseSchema,
-        trackingPeriod: z.enum(['Day', 'Total']),
+        objective: z.object({
+          steps: z.number().min(1, 'Please enter a valid number of steps'),
+          trackingPeriod: z.enum(['Day', 'Total'])
+        }),
       });
     case 'Team Challenge':
       return z.object({
@@ -136,32 +144,74 @@ const getObjectiveQuestions = (category: string, theme: string) => {
     case 'Steps':
       baseQuestions.push({
         name: 'objective',
-        label: 'What is the total number of steps required?',
-        subtitle: 'Define the primary goal that participants should achieve through this challenge',
+        label: 'How many steps should participants take?',
+        subtitle: 'Set the step goal and tracking period for this challenge',
         render: (field: any, _form: any, fieldState: any) => (
-          <ModernTextInput
-            value={field.value || ''}
-            onChange={field.onChange}
-            error={fieldState?.error?.message}
-            label="Steps"
-            placeholder="Enter number of steps"
-            type="number"
-          />
-        ),
-      }, {
-        name: 'trackingPeriod',
-        label: 'How should steps be tracked?',
-        subtitle: 'Specify the metrics and criteria that will determine if participants have achieved the objective',
-        render: (field: any, _form: any, fieldState: any) => (
-          <Select value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select tracking period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Day">Daily</SelectItem>
-              <SelectItem value="Total">Total</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="w-full max-w-md space-y-8">
+              {/* Steps Input */}
+              <div className="space-y-4">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <span className="text-2xl font-bold">Steps</span>
+                  <Input
+                    type="number"
+                    value={field.value?.steps?.toString() || ''}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      field.onChange({
+                        ...field.value,
+                        steps: isNaN(value) ? 0 : value
+                      });
+                    }}
+                    className={cn(
+                      'w-48 text-[4rem] leading-none text-center focus:outline-none transition-all bg-transparent font-bold border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 [&>input]:text-[4rem] [&>input]:h-auto [&>input]:py-0',
+                      fieldState?.error?.message ? 'text-destructive' : 'text-foreground'
+                    )}
+                    placeholder="Enter"
+                  />
+                </div>
+                {fieldState?.error?.message && (
+                  <p className="text-sm text-destructive text-center">{fieldState.error.message}</p>
+                )}
+              </div>
+
+              {/* Tracking Period Select */}
+              <div className="space-y-4">
+                <p className="text-lg font-medium text-center">Track steps</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    type="button"
+                    variant={field.value?.trackingPeriod === 'Day' ? 'default' : 'outline'}
+                    className="h-24 text-lg"
+                    onClick={() => {
+                      field.onChange({
+                        ...field.value,
+                        trackingPeriod: 'Day'
+                      });
+                    }}
+                  >
+                    Daily
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={field.value?.trackingPeriod === 'Total' ? 'default' : 'outline'}
+                    className="h-24 text-lg"
+                    onClick={() => {
+                      field.onChange({
+                        ...field.value,
+                        trackingPeriod: 'Total'
+                      });
+                    }}
+                  >
+                    Total
+                  </Button>
+                </div>
+                {fieldState?.error?.message && (
+                  <p className="text-sm text-destructive text-center">{fieldState.error.message}</p>
+                )}
+              </div>
+            </div>
+          </div>
         ),
       });
       break;
@@ -365,9 +415,9 @@ export function useObjectiveForm() {
       } : formData.objective?.primaryGoal || '',
       measurement: formData.objective?.measurement || '',
       trackingPeriod: formData.objective?.trackingPeriod || '',
-      squaresRequired: formData.objective?.squaresRequired || '5',
-      dailyChallenges: formData.objective?.dailyChallenges || '5',
-      questionsRequired: formData.objective?.questionsRequired || '5',
+      squaresRequired: formData.objective?.squaresRequired || '',
+      dailyChallenges: formData.objective?.dailyChallenges || '',
+      questionsRequired: formData.objective?.questionsRequired || '',
     },
     mode: 'onChange',
   });
@@ -385,7 +435,7 @@ export function ObjectiveStep({ subStep, form }: { subStep: number; form: Return
 
   useEffect(() => {
     const subscription = form.watch((value) => {
-      if (theme === 'Distance' && typeof value.objective === 'object' && value.objective?.value && value.objective?.unit) {
+      if (theme === 'Distance' && typeof value.objective === 'object' && 'value' in value.objective && value.objective.value && value.objective.unit) {
         dispatch(updateFormData({
           objective: {
             objective: value.objective.value.toString(),
@@ -393,6 +443,19 @@ export function ObjectiveStep({ subStep, form }: { subStep: number; form: Return
             primaryGoal: value.objective.value.toString(),
             measurement: value.objective.unit,
             trackingPeriod: formData.objective?.trackingPeriod || '',
+            squaresRequired: formData.objective?.squaresRequired || '',
+            dailyChallenges: formData.objective?.dailyChallenges || '',
+            questionsRequired: formData.objective?.questionsRequired || ''
+          }
+        }));
+      } else if (theme === 'Steps' && typeof value.objective === 'object' && 'steps' in value.objective && value.objective.steps) {
+        dispatch(updateFormData({
+          objective: {
+            objective: value.objective.steps.toString(),
+            successCriteria: value.measurement || '',
+            primaryGoal: value.objective.steps.toString(),
+            measurement: value.measurement || '',
+            trackingPeriod: value.trackingPeriod || '',
             squaresRequired: formData.objective?.squaresRequired || '',
             dailyChallenges: formData.objective?.dailyChallenges || '',
             questionsRequired: formData.objective?.questionsRequired || ''
@@ -444,7 +507,14 @@ export function ObjectiveStep({ subStep, form }: { subStep: number; form: Return
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentQuestion.render({ ...field, value: currentValue }, form, fieldState)}
+                {currentQuestion.render(
+                  { 
+                    ...field, 
+                    value: typeof currentValue === 'object' ? currentValue : field.value 
+                  }, 
+                  form, 
+                  fieldState
+                )}
               </motion.div>
             </AnimatePresence>
             <FormMessage />
