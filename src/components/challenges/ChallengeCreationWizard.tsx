@@ -371,28 +371,6 @@ export function ChallengeCreationWizard() {
       }
     }
 
-    console.log('Validation Debug:', {
-      step: currentStep,
-      subStep: {
-        basicInfo: basicInfoSubStep,
-        details: detailsSubStep,
-        objective: objectiveSubStep,
-        rewards: rewardsSubStep,
-        features: featuresSubStep
-      },
-      field: isBasicInfoStep ? basicInfoQuestions[basicInfoSubStep] :
-             isDetailsStep ? detailsQuestions[detailsSubStep] :
-             isObjectiveStep ? objectiveQuestions[objectiveSubStep] :
-             isRewardsStep ? rewardsQuestions[rewardsSubStep] :
-             isFeaturesStep ? featuresVisibleQuestions[featuresSubStep] : null,
-      value: isBasicInfoStep ? currentChallenge?.formData?.basicInformation?.[basicInfoQuestions[basicInfoSubStep]] :
-             isDetailsStep ? detailsForm.getValues(detailsQuestions[detailsSubStep]) :
-             isObjectiveStep ? objectiveForm.getValues(objectiveQuestions[objectiveSubStep]) :
-             isRewardsStep ? rewardsForm.getValues(rewardsQuestions[rewardsSubStep]) :
-             isFeaturesStep ? featuresForm.getValues(featuresVisibleQuestions[featuresSubStep] as any) : null,
-      isValid: currentIsValid
-    });
-
     setIsValid(currentIsValid);
   }, [
     showIntroduction,
@@ -682,10 +660,8 @@ export function ChallengeCreationWizard() {
     <div className="relative min-h-screen bg-background flex flex-col">
       {/* Sticky Top Bar */}
       <div className="sticky top-0 z-30 bg-white flex justify-between items-center px-6 py-4">
-        <div className="flex gap-2">
-          <Button variant="outline" className="rounded-full px-6" onClick={() => setShowExitModal(true)}>Save & exit</Button>
-          <Button variant="outline" className="rounded-full px-6" onClick={() => setShowFAQ(true)}>Questions?</Button>
-        </div>
+        <Button variant="outline" className="rounded-full px-6" onClick={() => setShowExitModal(true)}>Save & exit</Button>
+        <Button variant="outline" className="rounded-full px-6" onClick={() => setShowFAQ(true)}>Questions?</Button>
       </div>
 
       {/* Save & Exit Confirmation Modal */}
