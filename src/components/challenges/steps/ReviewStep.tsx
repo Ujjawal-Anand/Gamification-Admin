@@ -1,7 +1,7 @@
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Award, Trophy, Medal, Star, Crown, Target } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useState, useEffect } from 'react';
@@ -12,6 +12,21 @@ import { updateChallengeStatus } from '@/store/challengeSlice';
 const ReactConfetti = dynamic(() => import('react-confetti'), {
   ssr: false
 });
+
+// Badge definitions (should match RewardsStep.tsx)
+const challengeBadges = [
+  { value: 'badge1', label: 'Challenge Master', icon: Trophy },
+  { value: 'badge2', label: 'Health Champion', icon: Medal },
+  { value: 'badge3', label: 'Wellness Warrior', icon: Star },
+  { value: 'badge4', label: 'Fitness Pro', icon: Award },
+  { value: 'badge5', label: 'Wellness Leader', icon: Crown },
+  { value: 'badge6', label: 'Goal Achiever', icon: Target },
+];
+
+const defaultBadge = <Award className="w-20 h-20 text-orange-500 mx-auto" />;
+const defaultChallengeImg = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=facearea&w=256&q=80';
+const defaultRewardImg = 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=facearea&w=256&q=80';
+const defaultBenefitsImg = 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=facearea&w=256&q=80';
 
 interface ObjectiveData {
   steps?: number;
@@ -42,6 +57,9 @@ interface FormData {
     summary?: string;
     image?: string;
     heroImage?: string;
+    challengeStartDate?: string;
+    challengeEndDate?: string;
+    benefits?: string[];
   };
   rewards?: {
     types?: string[];
@@ -81,6 +99,7 @@ export function ReviewStep() {
     width: 0,
     height: 0,
   });
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -239,6 +258,28 @@ export function ReviewStep() {
     return String(value);
   };
 
+  const { details, rewards, basicInformation } = formData;
+  // Badge: use badgeId to find icon from challengeBadges
+  const badgeObj = challengeBadges.find(b => b.value === rewards?.badgeId);
+  const badgeIcon = badgeObj
+    ? <badgeObj.icon className="w-20 h-20 text-orange-500 mx-auto" />
+    : defaultBadge;
+  // Challenge image
+  const challengeImg = details?.image || defaultChallengeImg;
+  // Reward image (could be same as challenge image or a different field)
+  const rewardImg = details?.heroImage || defaultRewardImg;
+  // Benefits (array or fallback)
+  const benefits = Array.isArray((details as any)?.benefits) && (details as any).benefits.length > 0
+    ? (details as any).benefits
+    : [
+      'You may lower your overall blood pressure.',
+      'You can make improvements to your cardio health and daily mood.'
+    ];
+  // Dates
+  const dateRange = details?.challengeStartDate && details?.challengeEndDate
+    ? `${details.challengeStartDate} - ${details.challengeEndDate}`
+    : '';
+
   return (
     <div className="space-y-8">
       <div className="text-center mb-8">
@@ -246,33 +287,93 @@ export function ReviewStep() {
         <p className="text-muted-foreground">Please review all the information before publishing your challenge</p>
       </div>
 
-      <div className="space-y-6">
-        {sections.map((section) => (
-          <Card key={section.title} className="p-6">
-            <h3 className="text-xl font-semibold mb-4">{section.title}</h3>
-            <div className="space-y-4">
-              {section.fields.map((field) => {
-                if (field.showIf && !field.showIf(section.data)) return null;
-                
-                const value = getValue(section.data, field.key);
-                if (!value) return null;
-
-                return (
-                  <div key={field.key} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5" />
-                    <div>
-                      <p className="font-medium">{field.label}</p>
-                      <p className="text-muted-foreground">
-                        {formatValue(value)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        ))}
+      <div className="flex justify-end mb-4">
+        <Button variant="outline" onClick={() => setShowPreview(!showPreview)}>
+          {showPreview ? 'Hide Preview' : 'Show Preview'}
+        </Button>
       </div>
+
+      {showPreview ? (
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+          <div className="flex-1 overflow-y-auto">
+            <div className="bg-orange-50 p-6 rounded-b-3xl relative">
+              {/* Badge icon */}
+              <div className="flex justify-center mb-4">{badgeIcon}</div>
+              <h1 className="text-3xl font-bold text-center">{details?.name || 'Untitled Challenge'}</h1>
+              <div className="text-center text-lg mt-2">{details?.headline}</div>
+              <div className="text-center text-gray-500 mt-1">{dateRange}</div>
+            </div>
+
+            {/* The Challenge Section: image left, text right */}
+            <div className="bg-white rounded-xl shadow p-6 mt-6 mx-2 flex flex-row items-center gap-6 max-w-2xl mx-auto">
+              <img src={challengeImg} alt="Challenge" className="w-28 h-28 object-cover rounded-full border-4 border-orange-200 mr-6" />
+              <div className="flex-1">
+                <div className="font-bold text-xl mb-2">The challenge</div>
+                <div className="text-gray-700">{details?.summary || 'No summary provided.'}</div>
+              </div>
+            </div>
+
+            {/* The Reward Section: text left, image right */}
+            <div className="bg-white rounded-xl shadow p-6 mt-6 mx-2 flex flex-row-reverse items-center gap-6 max-w-2xl mx-auto">
+              <img src={rewardImg} alt="Reward" className="w-28 h-28 object-cover rounded-full border-4 border-orange-200 ml-6" />
+              <div className="flex-1">
+                <div className="font-bold text-xl mb-2">The reward</div>
+                <ul className="list-disc ml-5 text-gray-700">
+                  {rewards?.points && <li>Points: {rewards.points}</li>}
+                  {rewards?.badgeId && <li>Badge: <span className="underline">{badgeObj?.label || rewards.badgeId}</span></li>}
+                  {rewards?.types && rewards.types.length > 0 && <li>Types: {rewards.types.join(', ')}</li>}
+                </ul>
+              </div>
+            </div>
+
+            {/* Challenge Benefits Section: image left, text right */}
+            <div className="bg-orange-50 rounded-xl shadow p-6 mt-6 mx-2 flex flex-row items-center gap-6 max-w-2xl mx-auto">
+              <img src={defaultBenefitsImg} alt="Benefits" className="w-28 h-28 object-cover rounded-full border-4 border-orange-200 mr-6" />
+              <div className="flex-1">
+                <div className="font-bold text-xl mb-2">Challenge benefits</div>
+                <ul className="list-disc ml-5 text-gray-700">
+                  {benefits.map((b: string, i: number) => <li key={i}>{b}</li>)}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Sticky Join Button at Bottom */}
+          <div className="sticky bottom-0 left-0 w-full bg-white border-t z-50 flex justify-center py-6">
+            <Button size="lg" className="px-10 py-4 text-lg rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg">
+              Join Challenge
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {sections.map((section) => (
+            <Card key={section.title} className="p-6">
+              <h3 className="text-xl font-semibold mb-4">{section.title}</h3>
+              <div className="space-y-4">
+                {section.fields.map((field) => {
+                  if (field.showIf && !field.showIf(section.data)) return null;
+                  
+                  const value = getValue(section.data, field.key);
+                  if (!value) return null;
+
+                  return (
+                    <div key={field.key} className="flex items-start gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <p className="font-medium">{field.label}</p>
+                        <p className="text-muted-foreground">
+                          {formatValue(value)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="flex justify-end gap-4 mt-8">
         <Button variant="outline" onClick={() => handleSubmit('draft')}>Save as Draft</Button>

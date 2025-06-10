@@ -125,9 +125,9 @@ export default function DashboardPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={e => { e.stopPropagation(); handleView(challenge.id); }}>
+                            <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/challenges/preview?id=${challenge.id}`); }}>
                               <Eye className="w-4 h-4 mr-2" />
-                              View
+                              Preview
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={e => { e.stopPropagation(); handleEdit(challenge.id); }}>
                               <Edit className="w-4 h-4 mr-2" />

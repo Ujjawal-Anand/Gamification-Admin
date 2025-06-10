@@ -143,13 +143,6 @@ export default function DashboardPage() {
                                 List Challenge
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem 
-                              onClick={e => { e.stopPropagation(); handleDelete(challenge.id); }}
-                              className="text-destructive"
-                            >
-                              <Trash className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

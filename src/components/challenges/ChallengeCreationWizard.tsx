@@ -682,8 +682,10 @@ export function ChallengeCreationWizard() {
     <div className="relative min-h-screen bg-background flex flex-col">
       {/* Sticky Top Bar */}
       <div className="sticky top-0 z-30 bg-white flex justify-between items-center px-6 py-4">
-        <Button variant="outline" className="rounded-full px-6" onClick={() => setShowExitModal(true)}>Save & exit</Button>
-        <Button variant="outline" className="rounded-full px-6" onClick={() => setShowFAQ(true)}>Questions?</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="rounded-full px-6" onClick={() => setShowExitModal(true)}>Save & exit</Button>
+          <Button variant="outline" className="rounded-full px-6" onClick={() => setShowFAQ(true)}>Questions?</Button>
+        </div>
       </div>
 
       {/* Save & Exit Confirmation Modal */}
